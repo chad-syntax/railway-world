@@ -1,40 +1,49 @@
 # Railway World
 
-A 3D visualization tool for Railway infrastructure. This application renders your Railway services as buildings in a Minecraft-like world and visualizes requests between services in real-time.
+A 3D interactive visualization tool for Railway infrastructure. This application renders your Railway services as buildings in a Minecraft-inspired world and visualizes network traffic between services in real-time.
 
 ## Features
 
-- First-person navigation (WASD + mouse look, Space/Ctrl to fly)
-- 3D visualization of your Railway services as buildings
-- Real-time visualization of requests between services
-- GraphQL integration with Railway's API
+- Interactive 3D world with first-person controls (WASD + mouse look, Space/Ctrl to fly)
+- Visualization of Railway services as buildings with distinct characteristics
+- Real-time visualization of network traffic between services
+- Centralized "Internet" globe representing external traffic
+- GraphQL integration with Railway's API for fetching service data
+- Client-server architecture for real-time updates
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v16+)
+- Node.js (v22+ recommended)
 - A Railway account with API access
+- Your Railway API token
+- The project ID of the Railway project you want to visualize
 
 ### Installation
 
 1. Clone this repository
+
 ```bash
 git clone https://github.com/yourusername/railway-world.git
 cd railway-world
 ```
 
 2. Install dependencies
+
 ```bash
 npm install
 ```
 
-3. Start the development server
+3. Start the development server (both backend and frontend)
+
 ```bash
 npm run dev
 ```
 
 4. Open your browser and navigate to `http://localhost:5173`
+
+5. Enter your Railway API token and project ID in the configuration panel
 
 ## Controls
 
@@ -44,15 +53,38 @@ npm run dev
 - **Ctrl**: Fly down
 - **Click**: Enable pointer lock (press ESC to exit)
 
-## Development
+## Architecture
+
+The application consists of:
+
+1. **Frontend Client**: Three.js-based 3D visualization
+2. **Backend Server**: Fastify server that communicates with Railway's GraphQL API
 
 ### Project Structure
 
-- `src/main.ts`: Main application entry point
-- `src/world.ts`: Three.js scene setup
-- `src/controls.ts`: First-person controls
-- `src/api.ts`: Railway API integration
-- `src/buildings.ts`: Service visualization
+- `src/main.ts`: Frontend client entry point
+- `src/server.ts`: Backend server entry point
+- `src/lib/three/`: 3D visualization components
+  - `World.ts`: Main Three.js scene management
+  - `Building.ts`: Service visualization as 3D buildings
+  - `InternetGlobe.ts`: Central globe representing external traffic
+- `src/lib/graphql/`: Railway API integration
+- `src/buildings.ts`: Service visualization logic
+
+## Development
+
+### Running in Development Mode
+
+```bash
+# Start both frontend and backend in development mode
+npm run dev
+
+# Start only the frontend
+npm run dev:client
+
+# Start only the backend
+npm run dev:server
+```
 
 ### Building for Production
 
@@ -60,14 +92,10 @@ npm run dev
 npm run build
 ```
 
-The production build will be in the `dist` directory.
+The production build will be in the `dist` directory. To run the production server:
 
-## Connecting to Railway
-
-To connect to your Railway infrastructure, you'll need to provide an API token in a `.env` file:
-
-```
-VITE_RAILWAY_API_TOKEN=your_api_token_here
+```bash
+npm start
 ```
 
 ## License
