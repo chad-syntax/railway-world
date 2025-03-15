@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { WorldObject } from './WorldObject';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
-import { Building } from './Building';
+import { ServiceStructure } from './ServiceStructure';
 import { InternetGlobe } from './InternetGlobe';
+import { ConnectionLine, ConnectionPoint } from './ConnectionLine';
+import { RailwayData, Service } from '../../types';
+import { VolumeStructure } from './VolumeStructure';
+import { Billboard } from './Billboard';
 
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
@@ -134,107 +138,128 @@ export class World {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
 
-  public populate(railwayData: any) {
+  public populate(railwayData: RailwayData) {
     console.log(JSON.stringify(railwayData, null, 2));
+    console.log(railwayData.services);
 
-    // Extract services from the railway data
-    const services = railwayData.project.services.edges.map(
-      (edge: any) => edge.node
-    );
+    // Create the billboard
+    const billboard = new Billboard({
+      name: 'MainBillboard',
+      world: this,
+      position: {
+        x: 0,
+        y: 20, // 20 units up in the sky
+        z: -45, // At the edge of the ground area (which is 100x100)
+      },
+      projectName: railwayData.projectName,
+    });
+    this.addObject(billboard);
+
+    // Use the services array directly from the data
+    const services = railwayData.services;
 
     // Calculate layout parameters
-    const spacing = 7.5; // Space between buildings
-    const startX = -(services.length * spacing) / 2; // Center the buildings
+    const spacing = 7.5; // Space between serviceStructures
+    const startX = -((services.length - 1) * spacing) / 2; // Center the serviceStructures
 
-    // Create a building for each service
-    services.forEach((service: any, index: number) => {
+    // Combined loop to create serviceStructures, volumes, globes and handle connections
+    services.forEach((service: Service, index: number) => {
+      console.log(service);
       const xPosition = startX + index * spacing;
       const serviceName = service.name;
 
-      let serviceType = 'default';
-
-      if (service.name.toLowerCase().includes('postgres')) {
-        serviceType = 'postgres';
-      } else if (service.name.toLowerCase().includes('redis')) {
-        serviceType = 'redis';
-      } else if (service.name.toLowerCase().includes('node')) {
-        serviceType = 'nodejs';
-      } else if (service.name.toLowerCase().includes('postiz')) {
-        serviceType = 'postiz';
-      }
-
-      // Get source information if available
-      let sourceInfo = undefined;
-      if (service.serviceInstances?.edges?.length > 0) {
-        const instance = service.serviceInstances.edges[0].node;
-        if (instance.source) {
-          sourceInfo = {
-            image: instance.source.image,
-            repo: instance.source.repo,
-          };
-        }
-      }
-
-      // Create building with service information
-      const building = new Building({
+      // Create serviceStructure with service information
+      const serviceStructure = new ServiceStructure({
         name: serviceName,
         world: this,
-        service: {
-          id: `service-${index}`,
-          type: serviceType,
-          icon: service.icon,
-          source: sourceInfo,
+        service,
+        position: {
+          x: xPosition,
+          y: 0,
+          z: 0,
         },
-        x: xPosition,
-        y: 0,
-        z: 0,
       });
 
-      // Add the building to the world
-      this.addObject(building);
+      // Add the serviceStructure to the world
+      this.addObject(serviceStructure);
 
-      // Check for custom domains or service domains
-      if (service.serviceInstances?.edges?.length > 0) {
-        // Collect all domains for this service
-        const allDomains: string[] = [];
+      // If the service has a volume, create a VolumeStructure
+      if (service.volume) {
+        const volumeX = xPosition + serviceStructure.width / 2 + 1.5; // Position to the right of the service
 
-        for (const instanceEdge of service.serviceInstances.edges) {
-          const instance = instanceEdge.node;
-          if (instance.domains) {
-            // Add custom domains
-            if (instance.domains.customDomains?.length > 0) {
-              allDomains.push(
-                ...instance.domains.customDomains.map((d: any) => d.domain)
-              );
-            }
+        // Create the VolumeStructure
+        const volumeStructure = new VolumeStructure({
+          name: `Volume-${service.volume.name}`,
+          world: this,
+          volume: service.volume,
+          position: {
+            x: volumeX,
+            y: 0.5, // Half the height (1) to place it properly above ground
+            z: 1,
+          },
+        });
 
-            // Add service domains
-            if (instance.domains.serviceDomains?.length > 0) {
-              allDomains.push(
-                ...instance.domains.serviceDomains.map((d: any) => d.domain)
-              );
-            }
-          }
-        }
+        // Add the volume to the world
+        this.addObject(volumeStructure);
 
-        // If we have domains, create a single globe for all of them
-        if (allDomains.length > 0) {
-          const globeX = xPosition;
-          const globeZ = -5; // Place it 5 units behind the building
+        // Create a connection between the service and volume
+        this.createConnectionBetween(serviceStructure, volumeStructure, {
+          color: 0xffaa00, // Orange for service-to-volume connections
+        });
+      }
 
-          // Create the InternetGlobe
-          const globe = new InternetGlobe({
-            name: `Globe-${allDomains[0]}`,
-            world: this,
+      // If we have domains, create a globe for them
+      if (service.domains && service.domains.length > 0) {
+        const globeX = xPosition;
+        const globeZ = -10; // Place it behind the serviceStructure
+
+        // Create the InternetGlobe
+        const globe = new InternetGlobe({
+          name: `Globe-${service.domains[0]}`,
+          world: this,
+          position: {
             x: globeX,
             y: 0,
             z: globeZ,
-            domains: allDomains,
-            buildingId: building.id,
+          },
+          domains: service.domains,
+          serviceStructureId: serviceStructure.id,
+        });
+
+        // Add the globe to the world
+        this.addObject(globe);
+
+        // Create a connection between the globe and serviceStructure
+        this.createConnectionBetween(globe, serviceStructure, {});
+      }
+
+      // Handle connections within the same loop
+      if (service.connections && service.connections.length > 0) {
+        for (const targetId of service.connections) {
+          // Find the source and target serviceStructures
+          let sourceServiceStructure: WorldObject | undefined =
+            serviceStructure;
+          let targetServiceStructure: WorldObject | undefined;
+
+          // Find the target service structure
+          this.objects.forEach((obj) => {
+            if (obj instanceof ServiceStructure) {
+              if ((obj as any).service.id === targetId) {
+                targetServiceStructure = obj;
+              }
+            }
           });
 
-          // Add the globe to the world
-          this.addObject(globe);
+          // Create a connection if the target serviceStructure exists
+          if (targetServiceStructure) {
+            this.createConnectionBetween(
+              sourceServiceStructure,
+              targetServiceStructure,
+              {
+                color: 0x4caf50, // Green for service-to-service connections
+              }
+            );
+          }
         }
       }
     });
@@ -244,8 +269,6 @@ export class World {
 
   private updateControls = (delta: number) => {
     if (!this.controls.isLocked) return;
-
-    // We now receive delta from the animation loop
 
     // Calculate movement direction
     this.velocity.x = 0;
@@ -343,4 +366,81 @@ export class World {
         break;
     }
   };
+
+  // New method to create connections between world objects
+  private createConnectionBetween(
+    startObject: WorldObject,
+    endObject: WorldObject,
+    options: {
+      lineRadius?: number;
+      color?: number;
+    } = {}
+  ): ConnectionLine {
+    // Calculate center points based on object type and position
+    const getObjectCenterY = (obj: WorldObject) => {
+      if (obj instanceof InternetGlobe) {
+        // Globe is positioned at y=0 but its center should be at 0
+        return 0;
+      } else if (obj instanceof VolumeStructure) {
+        // Volume is positioned at y=0.5, and its center should be at 0
+        return 0;
+      } else {
+        // Service structure is positioned at y=0, center should be at height/2
+        return (obj as any).height / 2;
+      }
+    };
+
+    const startY = getObjectCenterY(startObject);
+    const endY = getObjectCenterY(endObject);
+
+    // Define connection points at the center of each object
+    const startPoint: ConnectionPoint = {
+      worldObject: startObject,
+      localPosition: new THREE.Vector3(0, startY, 0),
+    };
+
+    const endPoint: ConnectionPoint = {
+      worldObject: endObject,
+      localPosition: new THREE.Vector3(0, endY, 0),
+    };
+
+    // Create a unique name for the connection
+    const connectionName = `connection-${startObject.id}-to-${endObject.id}`;
+
+    // Create the connection line as a WorldObject
+    const connection = new ConnectionLine({
+      name: connectionName,
+      world: this,
+      position: { x: 0, y: 0, z: 0 }, // Position doesn't matter - it's determined by connected objects
+      startPoint,
+      endPoint,
+      lineRadius: options.lineRadius || 0.02,
+      color: options.color || 0x3498db,
+    });
+
+    // Add the connection to the world's objects
+    this.addObject(connection);
+
+    return connection;
+  }
+
+  // Public method to connect two serviceStructures
+  public connectServiceStructures(
+    serviceStructureA: ServiceStructure,
+    serviceStructureB: ServiceStructure,
+    options: {
+      lineRadius?: number;
+      color?: number;
+    } = {}
+  ): ConnectionLine {
+    return this.createConnectionBetween(serviceStructureA, serviceStructureB, {
+      lineRadius: options.lineRadius || 0.02,
+      color: options.color || 0x4caf50, // Default green for serviceStructure connections
+    });
+  }
+
+  // Add getter for max anisotropy
+  public get maxAnisotropy(): number {
+    return this.renderer.capabilities.getMaxAnisotropy();
+  }
 }

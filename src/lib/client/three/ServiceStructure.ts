@@ -1,42 +1,30 @@
 import * as THREE from 'three';
 import { World } from './World';
-import { WorldObject } from './WorldObject';
-import { breakTextIntoLines, processSourceText } from '../utils';
+import { Position, WorldObject } from './WorldObject';
+import { breakTextIntoLines, processSourceText } from '../../utils';
+import { Service } from '../../types';
 
-const BUILDING_TYPE_COLORS = {
+const SERVICE_STRUCTURE_TYPE_COLORS = {
   nodejs: 0x68a063, // Node.js green
   postgres: 0x336791, // Postgres blue
+  postgresql: 0x336791, // Postgres blue
   redis: 0xd82c20, // Redis red
   postiz: 0x612ad5, // light purple
   default: 0xaaaaaa, // Default gray
 } as const;
 
-type BuildingTypeColors = keyof typeof BUILDING_TYPE_COLORS;
+type ServiceStructureTypeColors = keyof typeof SERVICE_STRUCTURE_TYPE_COLORS;
 
-type Service = {
-  id: string;
-  type: string;
-  icon?: string;
-  source?: {
-    image?: string;
-    repo?: string | null;
-  };
-};
-
-type BuildingConstructorOptions = {
+type ServiceStructureConstructorOptions = {
   name: string;
   world: World;
   service: Service;
-  x: number;
-  y: number;
-  z: number;
+  position: Position;
 };
 
-export class Building extends WorldObject {
-  private group: THREE.Group;
-  private building: THREE.Mesh;
-  private buildingColor: number;
-  private nameSprite: THREE.Sprite;
+export class ServiceStructure extends WorldObject {
+  private serviceStructure: THREE.Mesh;
+  private serviceStructureColor: number;
   private nameColor: string;
   private service: Service;
   private iconMesh: THREE.Mesh | null = null;
@@ -47,44 +35,45 @@ export class Building extends WorldObject {
   public height: number = 3;
   public depth: number = 3;
 
-  constructor(options: BuildingConstructorOptions) {
+  constructor(options: ServiceStructureConstructorOptions) {
     super(options);
 
     const { service } = options;
 
     this.service = service;
 
-    this.group = new THREE.Group();
     this.group.userData.service = service;
 
     // Get color based on service type
-    this.buildingColor =
-      BUILDING_TYPE_COLORS[this.service.type as BuildingTypeColors] ||
-      BUILDING_TYPE_COLORS.default;
+    this.serviceStructureColor =
+      SERVICE_STRUCTURE_TYPE_COLORS[
+        this.service.name.toLowerCase() as ServiceStructureTypeColors
+      ] || SERVICE_STRUCTURE_TYPE_COLORS.default;
 
     this.nameColor = '#ffffff';
 
-    // Create building geometry
+    // Create serviceStructure geometry
     const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
     const material = new THREE.MeshStandardMaterial({
-      color: this.buildingColor,
+      color: this.serviceStructureColor,
       roughness: 0.4, // Reduced roughness for more vibrant appearance
       metalness: 0.25, // Slightly increased metalness
-      emissive: new THREE.Color(this.buildingColor).multiplyScalar(0.1), // Slight glow matching building color
+      emissive: new THREE.Color(this.serviceStructureColor).multiplyScalar(0.1), // Slight glow matching serviceStructure color
     });
 
-    this.building = new THREE.Mesh(geometry, material);
-    this.building.position.set(0, this.height / 2, 0);
-    this.building.castShadow = true;
-    this.building.receiveShadow = true;
+    this.serviceStructure = new THREE.Mesh(geometry, material);
+    this.serviceStructure.position.set(0, this.height / 2, 0);
+    this.serviceStructure.castShadow = true;
+    this.serviceStructure.receiveShadow = true;
 
-    // Create text sprite for service name
-    this.nameSprite = this.createTextSprite(this.name);
-    this.nameSprite.position.set(0, this.height + 1, 0);
+    this.createLabel(this.name, {
+      x: 0,
+      y: this.height + 1,
+      z: 0,
+    });
 
-    // Add building and name to group
-    this.group.add(this.building);
-    this.group.add(this.nameSprite);
+    // Add serviceStructure and name to group
+    this.group.add(this.serviceStructure);
 
     // Create and add the icon to the front face if an icon URL is provided
     if (this.service.icon) {
@@ -96,7 +85,7 @@ export class Building extends WorldObject {
       );
     }
 
-    // Add source information to the right side of the building
+    // Add source information to the right side of the serviceStructure
     if (this.service.source) {
       this.addSourceInfo(
         this.service.source,
@@ -107,7 +96,7 @@ export class Building extends WorldObject {
     }
 
     // Position the entire group
-    this.group.position.set(this.x, 0, this.z);
+    this.group.position.set(this.position.x, 0, this.position.z);
 
     this.world.scene.add(this.group);
   }

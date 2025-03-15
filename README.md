@@ -1,11 +1,11 @@
 # Railway World
 
-A 3D interactive visualization tool for Railway infrastructure. This application renders your Railway services as buildings in a Minecraft-inspired world and visualizes network traffic between services in real-time.
+A 3D interactive visualization tool for Railway infrastructure. This application renders your Railway services as structures in a Minecraft-inspired world and visualizes network traffic between services in real-time.
 
 ## Features
 
 - Interactive 3D world with first-person controls (WASD + mouse look, Space/Ctrl to fly)
-- Visualization of Railway services as buildings with distinct characteristics
+- Visualization of Railway services as structures with distinct characteristics
 - Real-time visualization of network traffic between services
 - Centralized "Internet" globe representing external traffic
 - GraphQL integration with Railway's API for fetching service data
@@ -35,7 +35,18 @@ cd railway-world
 npm install
 ```
 
-3. Start the development server (both backend and frontend)
+3. Copy the .env.example and set env vars
+
+```bash
+cp .env.example .env
+```
+
+```bash
+RAILWAY_TOKEN="your-railway-token"
+RAILWAY_PROJECT_ID="your-railway-project-id"
+```
+
+4. Start the development server (both backend and frontend)
 
 ```bash
 npm run dev
@@ -66,10 +77,10 @@ The application consists of:
 - `src/server.ts`: Backend server entry point
 - `src/lib/three/`: 3D visualization components
   - `World.ts`: Main Three.js scene management
-  - `Building.ts`: Service visualization as 3D buildings
+  - `ServiceStructure.ts`: Service visualization as 3D structures
   - `InternetGlobe.ts`: Central globe representing external traffic
 - `src/lib/graphql/`: Railway API integration
-- `src/buildings.ts`: Service visualization logic
+- `src/service-structures.ts`: Service visualization logic
 
 ## Development
 

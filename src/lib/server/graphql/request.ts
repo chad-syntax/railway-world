@@ -1,4 +1,4 @@
-import { GRAPHQL_API_URL } from '../constants';
+import { GRAPHQL_API_URL } from '../../constants';
 
 export const gqlRequest = async (
   query: string,

@@ -15,18 +15,19 @@
     <div id="loading-spinner">
       <div class="spinner"></div>
     </div>
-    <div id="config-panel" class="hidden">
+    <div id="error-panel" class="hidden">
       <div>
-        <form id="config-panel-form">
-          <label for="railway-token">Railway Token</label>
-          <input type="text" id="railway-token" />
-          <label for="railway-project-id">Railway Project ID</label>
-          <input type="text" id="railway-project-id" />
-          <button type="submit">Save</button>
-        </form>
+        <h1>Error</h1>
+        <p>Failed to load railway data</p>
+        <p>
+          Make sure you have a valid
+          <span class="code">RAILWAY_TOKEN</span> and
+          <span class="code">RAILWAY_PROJECT_ID</span> in the environment
+          variables
+        </p>
       </div>
     </div>
     <div id="root"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/client.ts"></script>
   </body>
 </html>
