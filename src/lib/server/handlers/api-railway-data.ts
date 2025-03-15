@@ -19,8 +19,8 @@ export async function handleRailwayData(
   try {
     // Extract railway token and project ID from query parameters
     const query = req.query as RailwayDataQueryParams;
-    const railwayToken = process.env.RAILWAY_TOKEN;
-    const railwayProjectId = process.env.RAILWAY_PROJECT_ID;
+    const railwayToken = process.env.RAILWAY_WORLD_TOKEN;
+    const railwayProjectId = process.env.RAILWAY_WORLD_PROJECT_ID;
 
     // Validate required parameters
     if (!railwayToken || !railwayProjectId) {

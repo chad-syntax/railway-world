@@ -42,8 +42,8 @@ cp .env.example .env
 ```
 
 ```bash
-RAILWAY_TOKEN="your-railway-token"
-RAILWAY_PROJECT_ID="your-railway-project-id"
+RAILWAY_WORLD_TOKEN="your-railway-token"
+RAILWAY_WORLD_PROJECT_ID="your-railway-project-id"
 ```
 
 4. Start the development server (both backend and frontend)
