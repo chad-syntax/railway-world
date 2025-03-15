@@ -38,7 +38,7 @@ export class InternetGlobe extends WorldObject {
     this.world.scene.add(this.group);
 
     // Create sprite text above the globe
-    this.createLabel('Public Networking', {
+    this.createLabel('Internet', {
       x: 0,
       y: this.globeRadius + 0.5,
       z: 0,
