@@ -1,11 +1,15 @@
 import { fetchRailwayData } from './lib/client/fetch-railway-data';
 import { World } from './lib/client/three/World';
+import { WebSocketClient } from './lib/client/websocket';
 
 const $root = document.getElementById('root')!;
 const $errorPanel = document.getElementById('error-panel')!;
 const $loadingSpinner = document.getElementById('loading-spinner')!;
 
-const run = async (railwayData: any) => {
+// Initialize WebSocket client
+const wsClient = new WebSocketClient();
+
+const run = (railwayData: any) => {
   const world = new World({ htmlRoot: $root });
 
   world.populate(railwayData);
@@ -40,7 +44,19 @@ async function main() {
     return;
   }
 
-  await run(data);
+  if (!data) {
+    console.error('No data received');
+    $errorPanel.classList.remove('hidden');
+    return;
+  }
+
+  const deploymentIds = data.services.map(
+    (service) => service.latestDeployment.id
+  );
+
+  wsClient.subscribeToLogs(deploymentIds);
+
+  run(data);
 }
 
 // Start the application

@@ -1,0 +1,251 @@
+// subscription streamHttplogs($deploymentId: String!, $filter: String, $beforeLimit: Int!, $beforeDate: String, $anchorDate: String, $afterDate: String) {
+//   httpLogs(
+//     deploymentId: $deploymentId
+//     filter: $filter
+//     beforeDate: $beforeDate
+//     anchorDate: $anchorDate
+//     afterDate: $afterDate
+//     beforeLimit: $beforeLimit
+//   ) {
+//     ...HttpLogFields
+//   }
+// }
+
+// fragment HttpLogFields on HttpLog {
+//   requestId
+//   timestamp
+//   method
+//   path
+//   host
+//   httpStatus
+//   upstreamProto
+//   downstreamProto
+//   responseDetails
+//   totalDuration
+//   upstreamAddress
+//   clientUa
+//   upstreamRqDuration
+//   txBytes
+//   rxBytes
+//   srcIp
+//   edgeRegion
+// }
+
+import WebSocket from 'ws';
+import { GRAPHQL_WS_API_URL } from '../../constants';
+
+export interface HttpLog {
+  requestId: string;
+  timestamp: string;
+  method: string;
+  path: string;
+  host: string;
+  httpStatus: number;
+  upstreamProto: string;
+  downstreamProto: string;
+  responseDetails: string;
+  totalDuration: number;
+  upstreamAddress: string;
+  clientUa: string;
+  upstreamRqDuration: number;
+  txBytes: number;
+  rxBytes: number;
+  srcIp: string;
+  edgeRegion: string;
+}
+
+export interface HttpLogsData {
+  httpLogs: HttpLog[];
+}
+
+export interface HttpLogsSubscriptionResponse {
+  data: HttpLogsData;
+}
+
+export interface SubscribeToLogsOptions {
+  deploymentId: string;
+  filter?: string;
+  beforeLimit: number;
+  beforeDate?: string;
+  anchorDate?: string;
+  afterDate?: string;
+  onData: (logs: HttpLog[]) => void;
+  onError?: (error: Error) => void;
+}
+
+// Singleton WebSocket connection manager
+class WebSocketManager {
+  private static instance: WebSocketManager;
+  private ws: WebSocket | null = null;
+  private isConnected = false;
+  private subscriptions = new Map<string, (data: any) => void>();
+  private connectionQueue: (() => void)[] = [];
+  private nextSubscriptionId = 1;
+
+  private constructor() {
+    this.setupWebSocket();
+  }
+
+  static getInstance(): WebSocketManager {
+    if (!WebSocketManager.instance) {
+      WebSocketManager.instance = new WebSocketManager();
+    }
+    return WebSocketManager.instance;
+  }
+
+  private setupWebSocket() {
+    if (this.ws) return;
+
+    this.ws = new WebSocket(GRAPHQL_WS_API_URL, ['graphql-transport-ws'], {
+      headers: {
+        Authorization: `Bearer ${process.env.RAILWAY_WORLD_TOKEN}`,
+      },
+    });
+
+    this.ws.on('open', () => {
+      console.log('Connected to Railway WebSocket');
+      this.ws?.send(
+        JSON.stringify({
+          type: 'connection_init',
+          payload: {
+            Authorization: `Bearer ${process.env.RAILWAY_WORLD_TOKEN}`,
+          },
+        })
+      );
+    });
+
+    this.ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log('Received message:', message);
+
+        switch (message.type) {
+          case 'connection_ack':
+            console.log('Connection acknowledged');
+            this.isConnected = true;
+            this.processConnectionQueue();
+            break;
+          case 'next':
+            if (message.id && message.payload?.data?.httpLogs) {
+              const callback = this.subscriptions.get(message.id);
+              if (callback) {
+                callback(message.payload.data.httpLogs);
+              }
+            }
+            break;
+          case 'error':
+            console.error('Subscription error:', message.payload);
+            break;
+          case 'complete':
+            console.log('Subscription completed');
+            break;
+        }
+      } catch (error) {
+        console.error('Error parsing message:', error);
+      }
+    });
+
+    this.ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
+
+    this.ws.on('close', (code, reason) => {
+      console.log('WebSocket closed:', { code, reason: reason.toString() });
+      this.isConnected = false;
+      this.ws = null;
+      // Attempt to reconnect after a delay
+      setTimeout(() => this.setupWebSocket(), 5000);
+    });
+  }
+
+  private processConnectionQueue() {
+    while (this.connectionQueue.length > 0) {
+      const callback = this.connectionQueue.shift();
+      callback?.();
+    }
+  }
+
+  async subscribe(options: SubscribeToLogsOptions): Promise<() => void> {
+    const subscriptionId = String(this.nextSubscriptionId++);
+
+    const subscribe = () => {
+      if (!this.ws || !this.isConnected) {
+        this.connectionQueue.push(() => subscribe());
+        return;
+      }
+
+      const subscribeMessage = {
+        id: subscriptionId,
+        type: 'subscribe',
+        payload: {
+          query: `
+            subscription streamHttplogs($deploymentId: String!, $filter: String, $beforeLimit: Int!, $beforeDate: String, $anchorDate: String, $afterDate: String) {
+              httpLogs(
+                deploymentId: $deploymentId
+                filter: $filter
+                beforeDate: $beforeDate
+                anchorDate: $anchorDate
+                afterDate: $afterDate
+                beforeLimit: $beforeLimit
+              ) {
+                requestId
+                timestamp
+                method
+                path
+                host
+                httpStatus
+                upstreamProto
+                downstreamProto
+                responseDetails
+                totalDuration
+                upstreamAddress
+                clientUa
+                upstreamRqDuration
+                txBytes
+                rxBytes
+                srcIp
+                edgeRegion
+              }
+            }
+          `,
+          variables: {
+            deploymentId: options.deploymentId,
+            filter: options.filter,
+            beforeLimit: options.beforeLimit,
+            beforeDate: options.beforeDate,
+            anchorDate: options.anchorDate,
+            afterDate: options.afterDate,
+          },
+        },
+      };
+
+      this.subscriptions.set(subscriptionId, options.onData);
+      this.ws?.send(JSON.stringify(subscribeMessage));
+    };
+
+    if (this.isConnected) {
+      subscribe();
+    } else {
+      this.connectionQueue.push(() => subscribe());
+      this.setupWebSocket();
+    }
+
+    return () => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(
+          JSON.stringify({
+            id: subscriptionId,
+            type: 'complete',
+          })
+        );
+      }
+      this.subscriptions.delete(subscriptionId);
+    };
+  }
+}
+
+export function subscribeToLogs(
+  options: SubscribeToLogsOptions
+): Promise<() => void> {
+  return WebSocketManager.getInstance().subscribe(options);
+}

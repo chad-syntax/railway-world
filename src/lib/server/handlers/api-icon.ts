@@ -8,16 +8,19 @@ interface IconQueryParams {
 export async function handleIcon(req: FastifyRequest, reply: FastifyReply) {
   try {
     const query = req.query as IconQueryParams;
-    const iconUrl = query.url;
 
-    if (!iconUrl) {
+    if (!query.url) {
       return reply.code(400).send({
         error: 'Missing required parameter',
         message: 'url is a required query parameter',
       });
     }
 
-    const isDevIcon = iconUrl.includes('devicons.railway.app');
+    const iconUrl = new URL(query.url);
+
+    const isDevIcon =
+      iconUrl.hostname === 'devicons.railway.app' ||
+      iconUrl.hostname === 'avatars.githubusercontent.com';
 
     if (!isDevIcon) {
       // Security check: validate URL is for an image file
@@ -31,7 +34,7 @@ export async function handleIcon(req: FastifyRequest, reply: FastifyReply) {
         '.webp',
       ];
       const hasValidExtension = validImageExtensions.some((ext) =>
-        iconUrl.toLowerCase().endsWith(ext)
+        iconUrl.pathname.toLowerCase().endsWith(ext)
       );
 
       if (!hasValidExtension) {

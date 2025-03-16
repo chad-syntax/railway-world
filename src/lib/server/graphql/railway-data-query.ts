@@ -5,6 +5,11 @@ export const railwayDataQuery = `
 query RailwayData($id: String!) {
   project(id: $id) {
     name
+    updatedAt
+    team {
+      name
+      avatar
+    }
     services {
       edges {
         node {
@@ -21,9 +26,14 @@ query RailwayData($id: String!) {
           serviceInstances {
             edges {
               node {
+                id  
                 serviceId
-                id
                 serviceName
+                latestDeployment {
+                  id
+                  status
+                  updatedAt
+                }
                 domains {
                   customDomains {
                     domain
@@ -78,6 +88,8 @@ query RailwayData($id: String!) {
 export function processRailwayData(rawData: any): RailwayData {
   const processedData: RailwayData = {
     projectName: rawData.data?.project?.name || '',
+    updatedAt: rawData.data?.project?.updatedAt || '',
+    team: rawData.data?.project?.team || { name: '', avatar: '' },
     services: [],
   };
 
@@ -102,7 +114,7 @@ export function processRailwayData(rawData: any): RailwayData {
   }
 
   // Create a map to collect service information
-  const serviceMap = new Map<string, any>();
+  const serviceMap = new Map<string, Service>();
 
   // Process service instances
   const serviceInstances = environment.serviceInstances?.edges || [];
@@ -110,19 +122,18 @@ export function processRailwayData(rawData: any): RailwayData {
     const instance = instanceEdge.node;
     const serviceId = instance.serviceId;
 
-    if (!serviceMap.has(serviceId)) {
-      serviceMap.set(serviceId, {
-        id: serviceId,
-        name: instance.serviceName,
-        icon: serviceIconMap.get(serviceId) || '', // Get icon from map
-        domains: [],
-        source: instance.source || { image: null, repo: null },
-        connections: [],
-      });
-    }
-
     // Collect domains
-    const service = serviceMap.get(serviceId);
+
+    const service: Service = {
+      id: serviceId,
+      name: instance.serviceName,
+      icon: serviceIconMap.get(serviceId) || '', // Get icon from map
+      domains: [],
+      source: instance.source || { image: null, repo: null },
+      connections: [],
+      latestDeployment: instance.latestDeployment,
+    };
+
     const allDomains: string[] = [];
 
     if (instance.domains?.customDomains?.length > 0) {
@@ -138,6 +149,8 @@ export function processRailwayData(rawData: any): RailwayData {
     }
 
     service.domains = [...service.domains, ...allDomains];
+
+    serviceMap.set(serviceId, service);
   }
 
   // Process volumes
@@ -146,8 +159,9 @@ export function processRailwayData(rawData: any): RailwayData {
     const volume = volumeEdge.node;
     const serviceId = volume.service.id;
 
-    if (serviceMap.has(serviceId)) {
-      const service = serviceMap.get(serviceId);
+    const service = serviceMap.get(serviceId);
+
+    if (service) {
       service.volume = {
         name: volume.volume.name,
         currentSizeMB: volume.currentSizeMB,
@@ -169,12 +183,14 @@ export function processRailwayData(rawData: any): RailwayData {
       if (serviceIdMatch && serviceIdMatch[1]) {
         const targetServiceId = serviceIdMatch[1];
 
+        const service = serviceMap.get(sourceServiceId);
+
         // Add connection if both services exist
         if (
           serviceMap.has(sourceServiceId) &&
-          serviceMap.has(targetServiceId)
+          serviceMap.has(targetServiceId) &&
+          service
         ) {
-          const service = serviceMap.get(sourceServiceId);
           if (!service.connections.includes(targetServiceId)) {
             service.connections.push(targetServiceId);
           }

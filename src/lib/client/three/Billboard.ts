@@ -6,21 +6,23 @@ type BillboardConstructorOptions = {
   name: string;
   world: World;
   position: Position;
-  projectName: string;
+  height: number;
+  width: number;
 };
 
-export class Billboard extends WorldObject {
-  private billboardMesh: THREE.Group;
-  private projectName: string;
-  private readonly BILLBOARD_WIDTH = 30;
-  private readonly BILLBOARD_HEIGHT = 15;
+export abstract class Billboard extends WorldObject {
+  public readonly BILLBOARD_WIDTH: number;
+  public readonly BILLBOARD_HEIGHT: number;
+
+  protected structurePanel: THREE.Mesh = new THREE.Mesh();
 
   constructor(options: BillboardConstructorOptions) {
     super(options);
-    this.projectName = options.projectName;
 
-    // Create the billboard structure
-    this.billboardMesh = new THREE.Group();
+    const { height, width } = options;
+    this.BILLBOARD_HEIGHT = height;
+    this.BILLBOARD_WIDTH = width;
+
     this.createBillboardStructure();
 
     // Position the billboard group at the specified height
@@ -37,114 +39,112 @@ export class Billboard extends WorldObject {
       this.BILLBOARD_HEIGHT,
       0.5
     );
+
     const panelMaterial = new THREE.MeshStandardMaterial({
       color: 0x2b2d42,
       metalness: 0.3,
       roughness: 0.7,
     });
-    const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-    panel.castShadow = true;
-    panel.receiveShadow = true;
+
+    this.structurePanel = new THREE.Mesh(panelGeometry, panelMaterial);
+    this.structurePanel.castShadow = true;
+    this.structurePanel.receiveShadow = true;
 
     // Add panel to the billboard mesh
-    this.billboardMesh.add(panel);
+    this.group.add(this.structurePanel);
 
     // Rotate the entire billboard to face forward
-    this.billboardMesh.rotation.y = Math.PI;
-
-    // Add the billboard mesh to the group
-    this.group.add(this.billboardMesh);
-
-    // Add the content on the front face
-    this.createBillboardContent(panel);
+    this.group.rotation.y = Math.PI;
   }
 
-  private async createBillboardContent(panel: THREE.Mesh): Promise<void> {
-    // Create a canvas for the billboard content
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    canvas.width = 2048;
-    canvas.height = 1024;
+  abstract createBillboardContent(): void;
 
-    // Fill background (matching the panel color but slightly lighter)
-    ctx.fillStyle = '#2b2d42';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // private async createBillboardContent(panel: THREE.Mesh): Promise<void> {
+  //   // Create a canvas for the billboard content
+  //   const canvas = document.createElement('canvas');
+  //   const ctx = canvas.getContext('2d')!;
+  //   canvas.width = 2048;
+  //   canvas.height = 1024;
 
-    // Load Railway icon
-    const iconSize = canvas.height * 0.2;
-    try {
-      const img = new Image();
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src =
-          '/api/icon?url=https://devicons.railway.com/i/railway-light.svg';
-      });
+  //   // Fill background (matching the panel color but slightly lighter)
+  //   ctx.fillStyle = '#2b2d42';
+  //   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw icon
-      ctx.drawImage(
-        img,
-        canvas.width * 0.1, // x position
-        canvas.height * 0.1, // y position
-        iconSize,
-        iconSize
-      );
-    } catch (error) {
-      console.error('Failed to load Railway icon:', error);
-    }
+  //   // Load Railway icon
+  //   const iconSize = canvas.height * 0.2;
+  //   try {
+  //     const img = new Image();
+  //     await new Promise((resolve, reject) => {
+  //       img.onload = resolve;
+  //       img.onerror = reject;
+  //       img.src =
+  //         '/api/icon?url=https://devicons.railway.com/i/railway-light.svg';
+  //     });
 
-    // Configure text settings
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ffffff';
+  //     // Draw icon
+  //     ctx.drawImage(
+  //       img,
+  //       canvas.width * 0.1, // x position
+  //       canvas.height * 0.1, // y position
+  //       iconSize,
+  //       iconSize
+  //     );
+  //   } catch (error) {
+  //     console.error('Failed to load Railway icon:', error);
+  //   }
 
-    // Draw project name
-    ctx.font = '112px monospace';
-    ctx.fillText(this.projectName, canvas.width * 0.23, canvas.height * 0.23);
+  //   // Configure text settings
+  //   ctx.textAlign = 'left';
+  //   ctx.fillStyle = '#ffffff';
 
-    // Draw credit text
-    ctx.font = '80px monospace';
-    ctx.fillText(
-      'Developed by Chad $yntax',
-      canvas.width * 0.1,
-      canvas.height * 0.5
-    );
+  //   // Draw project name
+  //   ctx.font = '112px monospace';
+  //   ctx.fillText(this.projectName, canvas.width * 0.23, canvas.height * 0.23);
 
-    // Draw social links
-    ctx.font = '60px monospace';
-    ctx.fillStyle = '#1DA1F2'; // Twitter blue
-    ctx.fillText('X - @SyntaxChad', canvas.width * 0.1, canvas.height * 0.7);
+  //   // Draw credit text
+  //   ctx.font = '80px monospace';
+  //   ctx.fillText(
+  //     'Developed by Chad $yntax',
+  //     canvas.width * 0.1,
+  //     canvas.height * 0.5
+  //   );
 
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(
-      'github.com/chad-syntax/railway-world',
-      canvas.width * 0.1,
-      canvas.height * 0.85
-    );
+  //   // Draw social links
+  //   ctx.font = '60px monospace';
+  //   ctx.fillStyle = '#1DA1F2'; // Twitter blue
+  //   ctx.fillText('X - @SyntaxChad', canvas.width * 0.1, canvas.height * 0.7);
 
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
+  //   ctx.fillStyle = '#ffffff';
+  //   ctx.fillText(
+  //     'github.com/chad-syntax/railway-world',
+  //     canvas.width * 0.1,
+  //     canvas.height * 0.85
+  //   );
 
-    // Create material with the texture
-    const contentMaterial = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-    });
+  //   // Create texture from canvas
+  //   const texture = new THREE.CanvasTexture(canvas);
+  //   texture.needsUpdate = true;
+  //   texture.minFilter = THREE.LinearFilter;
+  //   texture.magFilter = THREE.LinearFilter;
 
-    // Create a plane slightly in front of the panel
-    const contentGeometry = new THREE.PlaneGeometry(
-      this.BILLBOARD_WIDTH - 1,
-      this.BILLBOARD_HEIGHT - 1
-    );
-    const contentMesh = new THREE.Mesh(contentGeometry, contentMaterial);
-    contentMesh.position.z = -0.26; // Slightly in front of the panel
-    contentMesh.rotation.y = Math.PI; // Face the same way as the panel
+  //   // Create material with the texture
+  //   const contentMaterial = new THREE.MeshBasicMaterial({
+  //     map: texture,
+  //     transparent: true,
+  //   });
 
-    // Add to the billboard mesh
-    this.billboardMesh.add(contentMesh);
-  }
+  //   // Create a plane slightly in front of the panel
+  //   const contentGeometry = new THREE.PlaneGeometry(
+  //     this.BILLBOARD_WIDTH - 1,
+  //     this.BILLBOARD_HEIGHT - 1
+  //   );
+  //   const contentMesh = new THREE.Mesh(contentGeometry, contentMaterial);
+  //   contentMesh.position.z = -0.26; // Slightly in front of the panel
+  //   contentMesh.rotation.y = Math.PI; // Face the same way as the panel
+
+  //   // Add to the billboard mesh
+  //   this.group.add(contentMesh);
+  // }
 
   onUpdate(delta: number): void {
     // No need for updates - the billboard stays fixed

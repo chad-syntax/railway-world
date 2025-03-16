@@ -6,7 +6,8 @@ import { InternetGlobe } from './InternetGlobe';
 import { ConnectionLine, ConnectionPoint } from './ConnectionLine';
 import { RailwayData, Service } from '../../types';
 import { VolumeStructure } from './VolumeStructure';
-import { Billboard } from './Billboard';
+import { ProjectBillboard } from './ProjectBillboard';
+import { AuthorBillboard } from './AuthorBillboard';
 
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
@@ -140,10 +141,9 @@ export class World {
 
   public populate(railwayData: RailwayData) {
     console.log(JSON.stringify(railwayData, null, 2));
-    console.log(railwayData.services);
 
     // Create the billboard
-    const billboard = new Billboard({
+    const billboard = new ProjectBillboard({
       name: 'MainBillboard',
       world: this,
       position: {
@@ -152,9 +152,23 @@ export class World {
         z: -45, // At the edge of the ground area (which is 100x100)
       },
       projectName: railwayData.projectName,
+      updatedAt: railwayData.updatedAt,
+      team: railwayData.team,
     });
+
     this.addObject(billboard);
 
+    const authorBillboard = new AuthorBillboard({
+      name: 'AuthorBillboard',
+      world: this,
+      position: {
+        x: billboard.BILLBOARD_WIDTH / 2 + 6,
+        y: 20, // 20 units up in the sky
+        z: -45, // At the edge of the ground area (which is 100x100)
+      },
+    });
+
+    this.addObject(authorBillboard);
     // Use the services array directly from the data
     const services = railwayData.services;
 
@@ -164,7 +178,6 @@ export class World {
 
     // Combined loop to create serviceStructures, volumes, globes and handle connections
     services.forEach((service: Service, index: number) => {
-      console.log(service);
       const xPosition = startX + index * spacing;
       const serviceName = service.name;
 

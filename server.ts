@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -7,6 +8,8 @@ import fs from 'fs';
 import { handleRailwayData } from './src/lib/server/handlers/api-railway-data';
 import { handleIcon } from './src/lib/server/handlers/api-icon';
 import { config } from 'dotenv';
+import { WebSocketMessage } from './src/lib/types';
+import { handleWSMessage } from './src/lib/server/handlers/ws-handle-message';
 
 config();
 
@@ -24,6 +27,27 @@ const setupServer = async () => {
   await server.register(cors, {
     origin: true,
     credentials: true,
+  });
+
+  // Register WebSocket plugin
+  await server.register(websocket);
+
+  server.register(async function (fastify) {
+    fastify.get('/ws', { websocket: true }, (socket) => {
+      socket.on('message', (message: Buffer) => {
+        const messageStr = message.toString();
+        let parsedMessage: WebSocketMessage;
+        try {
+          parsedMessage = JSON.parse(messageStr);
+        } catch (error) {
+          console.error('Error parsing message:', error);
+          console.log('Received message:', messageStr);
+          return;
+        }
+
+        handleWSMessage(parsedMessage, socket);
+      });
+    });
   });
 
   // Railway data endpoint

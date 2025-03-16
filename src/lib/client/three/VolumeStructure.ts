@@ -53,7 +53,7 @@ export class VolumeStructure extends WorldObject {
     // Create wireframe cube
     const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
     const wireframeMaterial = new THREE.MeshStandardMaterial({
-      color: this.color,
+      color: 0x000000,
       wireframe: true,
       wireframeLinewidth: 2,
       transparent: true,
@@ -64,20 +64,70 @@ export class VolumeStructure extends WorldObject {
     this.group.add(this.wireframeMesh);
 
     // Create inner volume cube that shows usage
-    const usageRatio = this.volume.currentSizeMB / this.volume.sizeMB;
-    const innerHeight = Math.max(0.05, this.height * usageRatio);
+    const innerHeight = this.height * this.usage;
 
     const innerGeometry = new THREE.BoxGeometry(
       this.width,
       innerHeight,
       this.depth
     );
+
     const innerMaterial = new THREE.MeshStandardMaterial({
       color: this.color,
       roughness: 0.4,
       metalness: 0.6,
       emissive: new THREE.Color(this.color).multiplyScalar(0.2),
     });
+
+    const usageTextCanvas = document.createElement('canvas');
+    const usageTextContext = usageTextCanvas.getContext('2d')!;
+    usageTextCanvas.width = 1024;
+    usageTextCanvas.height = 1024;
+
+    usageTextContext.clearRect(
+      0,
+      0,
+      usageTextCanvas.width,
+      usageTextCanvas.height
+    );
+    usageTextContext.font = 'bold 128px Arial';
+    usageTextContext.fillStyle = '#ffffff';
+    usageTextContext.textAlign = 'center';
+    usageTextContext.textBaseline = 'middle';
+
+    const usageText = `${Math.round(this.volume.currentSizeMB)} / ${
+      this.volume.sizeMB
+    }mb`;
+    usageTextContext.fillText(
+      usageText,
+      usageTextCanvas.width / 2,
+      usageTextCanvas.height / 2
+    );
+
+    const usageTextTexture = new THREE.Texture(usageTextCanvas);
+    usageTextTexture.needsUpdate = true;
+    usageTextTexture.minFilter = THREE.LinearFilter;
+    usageTextTexture.magFilter = THREE.LinearFilter;
+
+    const usageTextMaterial = new THREE.MeshBasicMaterial({
+      map: usageTextTexture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+
+    const usageTextGeometry = new THREE.PlaneGeometry(
+      this.width,
+      this.height,
+      1
+    );
+
+    const usageTextMesh = new THREE.Mesh(usageTextGeometry, usageTextMaterial);
+
+    // Position on top face of the inner volume cube
+    const innerTopPosition = (innerHeight - this.height) / 2 + innerHeight / 2;
+    usageTextMesh.position.set(0, innerTopPosition + 0.001, 0); // Small offset to prevent z-fighting
+    usageTextMesh.rotation.x = -Math.PI / 2; // Rotate to lay flat on top
+    this.group.add(usageTextMesh);
 
     this.innerVolumeMesh = new THREE.Mesh(innerGeometry, innerMaterial);
     // Position inner volume at bottom of wireframe

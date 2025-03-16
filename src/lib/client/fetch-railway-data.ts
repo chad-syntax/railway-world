@@ -1,6 +1,8 @@
+import { RailwayData } from '../types';
+
 // Define the response type
 interface RailwayDataResponse {
-  data: any;
+  data?: RailwayData;
   error?: {
     message: string;
     [key: string]: any;
@@ -17,8 +19,6 @@ export const fetchRailwayData = async (): Promise<RailwayDataResponse> => {
   });
 
   const json = await response.json();
-
-  console.log(json);
 
   return json;
 };
