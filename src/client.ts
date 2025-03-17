@@ -1,16 +1,16 @@
 import { fetchRailwayData } from './lib/client/fetch-railway-data';
 import { World } from './lib/client/three/World';
 import { WebSocketClient } from './lib/client/websocket';
+import { RailwayData, Service, WebSocketLogsEvent } from './lib/types';
 
 const $root = document.getElementById('root')!;
 const $errorPanel = document.getElementById('error-panel')!;
 const $loadingSpinner = document.getElementById('loading-spinner')!;
 
-// Initialize WebSocket client
-const wsClient = new WebSocketClient();
+const run = (railwayData: RailwayData) => {
+  const wsClient = new WebSocketClient();
 
-const run = (railwayData: any) => {
-  const world = new World({ htmlRoot: $root });
+  const world = new World({ htmlRoot: $root, wsClient });
 
   world.populate(railwayData);
 
@@ -49,12 +49,6 @@ async function main() {
     $errorPanel.classList.remove('hidden');
     return;
   }
-
-  const deploymentIds = data.services.map(
-    (service) => service.latestDeployment.id
-  );
-
-  wsClient.subscribeToLogs(deploymentIds);
 
   run(data);
 }

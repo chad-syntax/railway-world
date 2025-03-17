@@ -1,36 +1,3 @@
-// subscription streamHttplogs($deploymentId: String!, $filter: String, $beforeLimit: Int!, $beforeDate: String, $anchorDate: String, $afterDate: String) {
-//   httpLogs(
-//     deploymentId: $deploymentId
-//     filter: $filter
-//     beforeDate: $beforeDate
-//     anchorDate: $anchorDate
-//     afterDate: $afterDate
-//     beforeLimit: $beforeLimit
-//   ) {
-//     ...HttpLogFields
-//   }
-// }
-
-// fragment HttpLogFields on HttpLog {
-//   requestId
-//   timestamp
-//   method
-//   path
-//   host
-//   httpStatus
-//   upstreamProto
-//   downstreamProto
-//   responseDetails
-//   totalDuration
-//   upstreamAddress
-//   clientUa
-//   upstreamRqDuration
-//   txBytes
-//   rxBytes
-//   srcIp
-//   edgeRegion
-// }
-
 import WebSocket from 'ws';
 import { GRAPHQL_WS_API_URL } from '../../constants';
 
@@ -117,7 +84,6 @@ class WebSocketManager {
     this.ws.on('message', (data) => {
       try {
         const message = JSON.parse(data.toString());
-        console.log('Received message:', message);
 
         switch (message.type) {
           case 'connection_ack':

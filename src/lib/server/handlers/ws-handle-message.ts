@@ -12,8 +12,6 @@ export const handleWSMessage = (
 ) => {
   switch (event.eventName) {
     case 'ping':
-      console.log('received ping event, sending pong');
-
       const pongEvent: WebSocketPongEvent = {
         eventName: 'pong',
         ts: Date.now(),
@@ -21,16 +19,17 @@ export const handleWSMessage = (
 
       socket.send(JSON.stringify(pongEvent));
       break;
-    case 'subscribeToLogs':
+    case 'subscribeToHTTPLogs':
       console.log(
-        'received subscribeToLogs event, subscribing to logs',
+        'received subscribeToHTTPLogs event, subscribing to http logs',
         event.deploymentIds
       );
 
       event.deploymentIds.forEach((deploymentId) => {
         subscribeToLogs({
           deploymentId,
-          beforeLimit: 0, // only get new logs
+          beforeLimit: 500,
+          beforeDate: new Date().toISOString(),
           onData: (logs) => {
             const logEvent: WebSocketLogsEvent = {
               eventName: 'logs',

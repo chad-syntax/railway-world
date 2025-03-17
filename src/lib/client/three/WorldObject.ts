@@ -15,9 +15,9 @@ type WorldObjectConstructorOptions = {
 };
 
 type CreateLabelOptions = {
-  canvasWidth: number;
-  canvasHeight: number;
-  fontSize: number;
+  canvasWidth?: number;
+  canvasHeight?: number;
+  fontSize?: number;
   fontFamily?: string;
   fontWeight?: string;
   textAlign?: CanvasTextAlign;
@@ -75,8 +75,8 @@ export abstract class WorldObject {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d')!;
 
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+    canvas.width = canvasWidth || DEFAULT_LABEL_OPTIONS.canvasWidth;
+    canvas.height = canvasHeight || DEFAULT_LABEL_OPTIONS.canvasHeight;
 
     context.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -86,6 +86,18 @@ export abstract class WorldObject {
     }`;
     context.textAlign = textAlign || DEFAULT_LABEL_OPTIONS.textAlign;
     context.textBaseline = textBaseline || DEFAULT_LABEL_OPTIONS.textBaseline;
+    // Add text shadow if background color is provided
+
+    // Add a black outline to the text for better visibility
+    context.strokeStyle = '#000000';
+    context.lineWidth = 4;
+    context.lineJoin = 'round';
+
+    // Draw the text outline first
+    context.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+    // Reset fill style to original color for the main text
+    context.fillStyle = color || '#ffffff';
 
     context.fillText(text, canvas.width / 2, canvas.height / 2);
 

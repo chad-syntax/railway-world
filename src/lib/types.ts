@@ -41,7 +41,11 @@ export interface RailwayData {
   team: Team;
 }
 
-export type WebSocketEventName = 'ping' | 'pong';
+export type WebSocketEventName =
+  | 'ping'
+  | 'pong'
+  | 'subscribeToHTTPLogs'
+  | 'logs';
 
 export type WebSocketPingEvent = {
   eventName: 'ping';
@@ -53,8 +57,8 @@ export type WebSocketPongEvent = {
   ts: number;
 };
 
-export type WebSocketSubscribeToLogsEvent = {
-  eventName: 'subscribeToLogs';
+export type WebSocketSubscribeToHTTPLogsEvent = {
+  eventName: 'subscribeToHTTPLogs';
   deploymentIds: string[];
 };
 
@@ -67,5 +71,5 @@ export type WebSocketLogsEvent = {
 export type WebSocketMessage =
   | WebSocketPingEvent
   | WebSocketPongEvent
-  | WebSocketSubscribeToLogsEvent
+  | WebSocketSubscribeToHTTPLogsEvent
   | WebSocketLogsEvent;

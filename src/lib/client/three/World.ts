@@ -4,17 +4,21 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import { ServiceStructure } from './ServiceStructure';
 import { InternetGlobe } from './InternetGlobe';
 import { ConnectionLine, ConnectionPoint } from './ConnectionLine';
-import { RailwayData, Service } from '../../types';
+import { RailwayData, Service, WebSocketLogsEvent } from '../../types';
 import { VolumeStructure } from './VolumeStructure';
 import { ProjectBillboard } from './ProjectBillboard';
 import { AuthorBillboard } from './AuthorBillboard';
-
+import { HttpLog } from '../../server/graphql/subscribe-to-logs';
+import { WebSocketClient } from '../websocket';
+import { RequestBlock } from './RequestBlock';
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
+  wsClient: WebSocketClient;
 };
 
 export class World {
   private htmlRoot: HTMLElement;
+  protected wsClient: WebSocketClient;
   private populated: boolean = false;
   public scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -42,9 +46,10 @@ export class World {
   public objects: Map<string, WorldObject> = new Map();
 
   constructor(options: WorldConstructorOptions) {
-    const { htmlRoot } = options;
+    const { htmlRoot, wsClient } = options;
 
     this.htmlRoot = htmlRoot;
+    this.wsClient = wsClient;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
@@ -139,8 +144,103 @@ export class World {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
 
+  public populateRequest(service: Service, logs: HttpLog[]) {
+    // find the connecting line for the service
+    // so that means we first find the service structure for the service
+    // then we fine the connecting line for the service structure
+    // then we use the connecting line to position the request block
+
+    const allObjects = Array.from(this.objects.values());
+    const serviceStructure = allObjects.find(
+      (obj) => obj instanceof ServiceStructure && obj.service.id === service.id
+    );
+
+    if (!serviceStructure) {
+      console.error('Service structure not found for service', service.name);
+      return;
+    }
+
+    const connectionLine = allObjects.find(
+      (obj) =>
+        obj instanceof ConnectionLine &&
+        obj.endPoint.worldObject.id === serviceStructure.id &&
+        obj.startPoint.worldObject instanceof InternetGlobe
+    );
+
+    if (!connectionLine) {
+      console.error(
+        'Connection line not found for service structure',
+        serviceStructure.id
+      );
+      return;
+    }
+
+    // Extract path coordinates from connection line
+    const startPos = new THREE.Vector3();
+    const endPos = new THREE.Vector3();
+
+    // Cast to ConnectionLine type to access the methods
+    const connLine = connectionLine as ConnectionLine;
+
+    // Get the positions
+    connLine.getStartPosition(startPos);
+    connLine.getEndPosition(endPos);
+
+    logs.forEach((log, index) => {
+      setTimeout(() => {
+        const requestBlock = new RequestBlock({
+          service,
+          log,
+          world: this,
+          position: {
+            x: startPos.x,
+            y: startPos.y,
+            z: startPos.z,
+          },
+          endPosition: {
+            x: endPos.x,
+            y: endPos.y,
+            z: endPos.z,
+          },
+        });
+
+        this.addObject(requestBlock);
+      }, index * 500); // Add 500ms delay between requests
+    });
+  }
+
   public populate(railwayData: RailwayData) {
     console.log(JSON.stringify(railwayData, null, 2));
+
+    const deploymentIds = railwayData.services
+      .filter((service) => service.domains.length > 0) // if the service has a domain, it will have http logs
+      .map((service) => service.latestDeployment.id);
+
+    const deploymentToServiceMap = railwayData.services.reduce(
+      (acc, service) => {
+        acc[service.latestDeployment.id] = service;
+        return acc;
+      },
+      {} as Record<string, Service>
+    );
+
+    this.wsClient.onConnect(() => {
+      this.wsClient.subscribeToHTTPLogs(deploymentIds);
+    });
+
+    this.wsClient.onMessage('logs', (e) => {
+      const event = e as WebSocketLogsEvent;
+
+      const service = deploymentToServiceMap[event.deploymentId];
+      if (!service) {
+        console.error('Service not found for deployment', event.deploymentId);
+        return;
+      }
+
+      if (event.logs.length > 0) {
+        this.populateRequest(service, event.logs);
+      }
+    });
 
     // Create the billboard
     const billboard = new ProjectBillboard({
@@ -191,6 +291,7 @@ export class World {
           y: 0,
           z: 0,
         },
+        deployment: service.latestDeployment,
       });
 
       // Add the serviceStructure to the world
@@ -237,6 +338,7 @@ export class World {
           },
           domains: service.domains,
           serviceStructureId: serviceStructure.id,
+          serviceId: service.id,
         });
 
         // Add the globe to the world

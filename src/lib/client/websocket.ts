@@ -1,7 +1,22 @@
-import { WebSocketMessage, WebSocketPingEvent } from '../types';
+import {
+  WebSocketEventName,
+  WebSocketMessage,
+  WebSocketPingEvent,
+  WebSocketSubscribeToHTTPLogsEvent,
+} from '../types';
 
 export class WebSocketClient {
   private ws: WebSocket;
+  private onConnectEventListeners: (() => void)[] = [];
+  private messageListeners: Record<
+    WebSocketEventName,
+    ((event: WebSocketMessage) => void)[]
+  > = {
+    ping: [],
+    pong: [],
+    subscribeToHTTPLogs: [],
+    logs: [],
+  };
 
   constructor() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -11,6 +26,7 @@ export class WebSocketClient {
 
     this.ws.onopen = () => {
       console.log('Connected to WebSocket server');
+      this.onConnectEventListeners.forEach((callback) => callback());
     };
 
     this.ws.onclose = () => {
@@ -35,22 +51,21 @@ export class WebSocketClient {
     };
   }
 
+  public onConnect(callback: () => void) {
+    this.onConnectEventListeners.push(callback);
+  }
+
+  public onMessage(
+    eventName: WebSocketEventName,
+    callback: (event: WebSocketMessage) => void
+  ) {
+    this.messageListeners[eventName].push(callback);
+  }
+
   private handleMessage(event: WebSocketMessage) {
-    switch (event.eventName) {
-      case 'pong':
-        console.log('Received pong from server');
-        break;
-      case 'logs':
-        console.log(
-          'Received logs from server',
-          event.logs,
-          'for deployment',
-          event.deploymentId
-        );
-        break;
-      default:
-        console.warn('Unhandled message type:', event.eventName);
-    }
+    this.messageListeners[event.eventName].forEach((callback) =>
+      callback(event)
+    );
   }
 
   public sendPing() {
@@ -66,11 +81,14 @@ export class WebSocketClient {
     }
   }
 
-  public subscribeToLogs(deploymentIds: string[]) {
+  public subscribeToHTTPLogs(deploymentIds: string[]) {
     if (this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({ eventName: 'subscribeToLogs', deploymentIds })
-      );
+      const subscribeToHTTPLogsEvent: WebSocketSubscribeToHTTPLogsEvent = {
+        eventName: 'subscribeToHTTPLogs',
+        deploymentIds,
+      };
+
+      this.ws.send(JSON.stringify(subscribeToHTTPLogsEvent));
     } else {
       console.warn('WebSocket is not connected, cannot subscribe to logs');
     }

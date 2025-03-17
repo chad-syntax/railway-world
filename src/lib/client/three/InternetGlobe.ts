@@ -9,6 +9,7 @@ type InternetGlobeConstructorOptions = {
   position: Position;
   domains: string[]; // Changed to array of domains
   serviceStructureId: string; // ID of the service structure this globe is connected to
+  serviceId: string; // ID of the service this globe is connected to
 };
 
 export class InternetGlobe extends WorldObject {
@@ -18,12 +19,15 @@ export class InternetGlobe extends WorldObject {
   private globeRadius = 1.5;
   private globeHeight = 1.5; // Equal to globeRadius so bottom of globe rests on ground level
 
+  public serviceId: string;
+
   constructor(options: InternetGlobeConstructorOptions) {
     super(options);
 
-    const { domains } = options;
+    const { domains, serviceId } = options;
 
     this.domains = domains;
+    this.serviceId = serviceId;
 
     // Create the globe mesh (World Wide Web style)
     this.createGlobe();

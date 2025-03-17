@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { World } from './World';
 import { Position, WorldObject } from './WorldObject';
 import { breakTextIntoLines, processSourceText } from '../../utils';
-import { Service } from '../../types';
+import { Service, Deployment } from '../../types';
 
 const SERVICE_STRUCTURE_TYPE_COLORS = {
   nodejs: 0x68a063, // Node.js green
@@ -20,16 +20,18 @@ type ServiceStructureConstructorOptions = {
   world: World;
   service: Service;
   position: Position;
+  deployment: Deployment;
 };
 
 export class ServiceStructure extends WorldObject {
   private serviceStructure: THREE.Mesh;
   private serviceStructureColor: number;
   private nameColor: string;
-  private service: Service;
+  public service: Service;
   private iconMesh: THREE.Mesh | null = null;
   private sourceIconMesh: THREE.Mesh | null = null;
   private sourceTextMesh: THREE.Mesh | null = null;
+  private deployment: Deployment;
 
   public width: number = 3;
   public height: number = 3;
@@ -38,9 +40,10 @@ export class ServiceStructure extends WorldObject {
   constructor(options: ServiceStructureConstructorOptions) {
     super(options);
 
-    const { service } = options;
+    const { service, deployment } = options;
 
     this.service = service;
+    this.deployment = deployment;
 
     this.group.userData.service = service;
 
@@ -95,10 +98,101 @@ export class ServiceStructure extends WorldObject {
       );
     }
 
+    // add deployment info at the top of the front face of the serviceStructure
+    this.addDeploymentInfo(
+      this.deployment,
+      this.width,
+      this.height,
+      this.depth
+    );
+
     // Position the entire group
     this.group.position.set(this.position.x, 0, this.position.z);
 
     this.world.scene.add(this.group);
+  }
+
+  private addDeploymentInfo(
+    deployment: Deployment,
+    width: number,
+    height: number,
+    depth: number
+  ): void {
+    const deploymentInfo = deployment.status;
+
+    // Create a canvas for the status text
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+
+    // Set canvas dimensions
+    const canvasWidth = 256;
+    const canvasHeight = 64;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    // Clear the canvas
+    context.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Set text properties
+    const fontSize = 24;
+    const fontFamily = 'monospace';
+    context.font = `bold ${fontSize}px ${fontFamily}`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    // Determine text color based on status
+    let textColor;
+    switch (deploymentInfo) {
+      case 'SUCCESS':
+        textColor = '#00cc00'; // Green
+        break;
+      case 'SLEEPING':
+        textColor = '#ffcc00'; // Yellow
+        break;
+      case 'FAILED':
+      case 'CRASHED':
+        textColor = '#ff0000'; // Red
+        break;
+      default:
+        textColor = '#3399ff'; // Blue
+    }
+
+    // Add black outline
+    context.strokeStyle = '#000000';
+    context.lineWidth = 3;
+    context.strokeText(deploymentInfo, canvasWidth / 2, canvasHeight / 2);
+
+    // Draw the text with the appropriate color
+    context.fillStyle = textColor;
+    context.fillText(deploymentInfo, canvasWidth / 2, canvasHeight / 2);
+
+    // Create texture from canvas
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+
+    // Create material with the texture
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+
+    // Create a plane for the text
+    const statusWidth = width * 0.8;
+    const statusHeight = height * 0.2;
+    const statusGeometry = new THREE.PlaneGeometry(statusWidth, statusHeight);
+
+    // Create mesh with the material
+    const statusMesh = new THREE.Mesh(statusGeometry, material);
+
+    // Position at the top of the front face
+    statusMesh.position.set(0, height - 0.25, depth / 2 + 0.01);
+
+    // Add to the group
+    this.group.add(statusMesh);
   }
 
   private addServiceIcon(
@@ -191,13 +285,13 @@ export class ServiceStructure extends WorldObject {
     }
 
     // Create source text as a texture on a plane instead of a sprite
-    this.createTextTexture(sourceText, width, height, depth);
+    this.createSourceTextTexture(sourceText, width, height, depth);
 
     // Add source icon
     this.addSourceIcon(iconUrl, width, height, depth);
   }
 
-  private createTextTexture(
+  private createSourceTextTexture(
     text: string,
     width: number,
     height: number,

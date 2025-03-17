@@ -20,8 +20,8 @@ type ConnectionLineConstructorOptions = {
 export class ConnectionLine extends WorldObject {
   private connectionMesh: THREE.Mesh | null = null;
   private tubeMaterial!: THREE.MeshStandardMaterial;
-  private startPoint: ConnectionPoint;
-  private endPoint: ConnectionPoint;
+  public startPoint: ConnectionPoint;
+  public endPoint: ConnectionPoint;
   private lineRadius: number;
   private color: number;
 
@@ -157,5 +157,25 @@ export class ConnectionLine extends WorldObject {
     this.tubeMaterial.dispose();
 
     this.world.scene.remove(this.group);
+  }
+
+  // Get the world position of the start point
+  public getStartPosition(targetVector?: THREE.Vector3): THREE.Vector3 {
+    const worldPosition = this.getWorldPosition(this.startPoint);
+    if (targetVector) {
+      targetVector.copy(worldPosition);
+      return targetVector;
+    }
+    return worldPosition;
+  }
+
+  // Get the world position of the end point
+  public getEndPosition(targetVector?: THREE.Vector3): THREE.Vector3 {
+    const worldPosition = this.getWorldPosition(this.endPoint);
+    if (targetVector) {
+      targetVector.copy(worldPosition);
+      return targetVector;
+    }
+    return worldPosition;
   }
 }
