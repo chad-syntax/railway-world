@@ -31,7 +31,8 @@ export class ServiceStructure extends WorldObject {
   private iconMesh: THREE.Mesh | null = null;
   private sourceIconMesh: THREE.Mesh | null = null;
   private sourceTextMesh: THREE.Mesh | null = null;
-  private deployment: Deployment;
+  public deployment: Deployment;
+  private statusMesh: THREE.Mesh | null = null;
 
   public width: number = 3;
   public height: number = 3;
@@ -186,13 +187,25 @@ export class ServiceStructure extends WorldObject {
     const statusGeometry = new THREE.PlaneGeometry(statusWidth, statusHeight);
 
     // Create mesh with the material
-    const statusMesh = new THREE.Mesh(statusGeometry, material);
+    this.statusMesh = new THREE.Mesh(statusGeometry, material);
 
     // Position at the top of the front face
-    statusMesh.position.set(0, height - 0.25, depth / 2 + 0.01);
+    this.statusMesh.position.set(0, height - 0.25, depth / 2 + 0.01);
 
     // Add to the group
-    this.group.add(statusMesh);
+    this.group.add(this.statusMesh);
+  }
+
+  public updateDeployment(deployment: Deployment) {
+    this.deployment = deployment;
+
+    if (this.statusMesh) {
+      console.log('removing status mesh');
+      this.group.remove(this.statusMesh);
+    }
+
+    console.log('adding status mesh');
+    this.addDeploymentInfo(deployment, this.width, this.height, this.depth);
   }
 
   private addServiceIcon(

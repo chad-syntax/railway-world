@@ -3,6 +3,7 @@ import {
   WebSocketMessage,
   WebSocketPingEvent,
   WebSocketSubscribeToHTTPLogsEvent,
+  WebSocketSubscribeToLatestDeploymentsEvent,
 } from '../types';
 
 export class WebSocketClient {
@@ -16,6 +17,8 @@ export class WebSocketClient {
     pong: [],
     subscribeToHTTPLogs: [],
     logs: [],
+    subscribeToLatestDeployments: [],
+    latestDeployments: [],
   };
 
   constructor() {
@@ -91,6 +94,21 @@ export class WebSocketClient {
       this.ws.send(JSON.stringify(subscribeToHTTPLogsEvent));
     } else {
       console.warn('WebSocket is not connected, cannot subscribe to logs');
+    }
+  }
+
+  public subscribeToLatestDeployments() {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      const subscribeToLatestDeploymentsEvent: WebSocketSubscribeToLatestDeploymentsEvent =
+        {
+          eventName: 'subscribeToLatestDeployments',
+        };
+
+      this.ws.send(JSON.stringify(subscribeToLatestDeploymentsEvent));
+    } else {
+      console.warn(
+        'WebSocket is not connected, cannot subscribe to latest deployments'
+      );
     }
   }
 

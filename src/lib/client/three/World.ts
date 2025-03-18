@@ -4,7 +4,12 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import { ServiceStructure } from './ServiceStructure';
 import { InternetGlobe } from './InternetGlobe';
 import { ConnectionLine, ConnectionPoint } from './ConnectionLine';
-import { RailwayData, Service, WebSocketLogsEvent } from '../../types';
+import {
+  RailwayData,
+  Service,
+  WebSocketLogsEvent,
+  WebSocketLatestDeploymentsEvent,
+} from '../../types';
 import { VolumeStructure } from './VolumeStructure';
 import { ProjectBillboard } from './ProjectBillboard';
 import { AuthorBillboard } from './AuthorBillboard';
@@ -226,6 +231,7 @@ export class World {
 
     this.wsClient.onConnect(() => {
       this.wsClient.subscribeToHTTPLogs(deploymentIds);
+      this.wsClient.subscribeToLatestDeployments();
     });
 
     this.wsClient.onMessage('logs', (e) => {
@@ -240,6 +246,28 @@ export class World {
       if (event.logs.length > 0) {
         this.populateRequest(service, event.logs);
       }
+    });
+
+    this.wsClient.onMessage('latestDeployments', (e) => {
+      const event = e as WebSocketLatestDeploymentsEvent;
+
+      // console.log('received latest deployments', event.nodes);
+
+      // iterate over event.nodes and update the latest deployment for the service
+      event.nodes.forEach((node) => {
+        // find the service structure for the service
+        this.objects.forEach((obj) => {
+          if (obj instanceof ServiceStructure) {
+            if (
+              (obj as ServiceStructure).service.id === node.serviceId &&
+              (obj as ServiceStructure).deployment.status !==
+                node.latestDeployment.status
+            ) {
+              (obj as ServiceStructure).updateDeployment(node.latestDeployment);
+            }
+          }
+        });
+      });
     });
 
     // Create the billboard

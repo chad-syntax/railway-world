@@ -1,7 +1,7 @@
 import { fetchRailwayData } from './lib/client/fetch-railway-data';
 import { World } from './lib/client/three/World';
 import { WebSocketClient } from './lib/client/websocket';
-import { RailwayData, Service, WebSocketLogsEvent } from './lib/types';
+import { RailwayData } from './lib/types';
 
 const $root = document.getElementById('root')!;
 const $errorPanel = document.getElementById('error-panel')!;

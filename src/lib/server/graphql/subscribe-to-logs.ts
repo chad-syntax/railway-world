@@ -1,5 +1,7 @@
 import WebSocket from 'ws';
 import { GRAPHQL_WS_API_URL } from '../../constants';
+import { requestLatestDeployments } from './latest-deployments-query';
+import { Deployment } from '../../types';
 
 export interface HttpLog {
   requestId: string;
@@ -40,6 +42,13 @@ export interface SubscribeToLogsOptions {
   onError?: (error: Error) => void;
 }
 
+type LatestDeploymentsCallback = (
+  nodes: {
+    serviceId: string;
+    latestDeployment: Deployment;
+  }[]
+) => void;
+
 // Singleton WebSocket connection manager
 class WebSocketManager {
   private static instance: WebSocketManager;
@@ -48,6 +57,11 @@ class WebSocketManager {
   private subscriptions = new Map<string, Set<(data: any) => void>>();
   private connectionQueue: (() => void)[] = [];
   private activeSubscriptionIds = new Map<string, string>();
+  private latestDeploymentsSubscriptions = new Map<
+    string,
+    Set<LatestDeploymentsCallback>
+  >();
+  private latestDeploymentPolls = new Map<string, NodeJS.Timeout>();
 
   private constructor() {
     this.setupWebSocket();
@@ -248,6 +262,38 @@ class WebSocketManager {
     this.activeSubscriptionIds.delete(deploymentId);
     this.subscriptions.delete(deploymentId);
   }
+
+  private pollLatestDeployments(projectId: string) {
+    this.latestDeploymentPolls.set(
+      projectId,
+      setInterval(async () => {
+        const response = await requestLatestDeployments(projectId);
+        const nodes = response.project.environments.edges.flatMap((edge) =>
+          edge.node.serviceInstances.edges.map((edge) => edge.node)
+        );
+        this.latestDeploymentsSubscriptions
+          .get(projectId)
+          ?.forEach((callback) => callback(nodes));
+      }, 2000)
+    );
+  }
+
+  public subscribeToLatestDeployments(
+    projectId: string,
+    callback: LatestDeploymentsCallback
+  ): void {
+    // check if any subscriptions for latest deployments exist for this projectId
+    // if so, add the callback to the existing subscriptions
+    // if not create a new subscription and add the callback to it
+    if (this.latestDeploymentsSubscriptions.has(projectId)) {
+      const callbacks = this.latestDeploymentsSubscriptions.get(projectId)!;
+      callbacks.add(callback);
+    } else {
+      this.latestDeploymentsSubscriptions.set(projectId, new Set([callback]));
+      // poll the data from the gql api
+      this.pollLatestDeployments(projectId);
+    }
+  }
 }
 
 export function subscribeToLogs(
@@ -255,3 +301,13 @@ export function subscribeToLogs(
 ): Promise<() => void> {
   return WebSocketManager.getInstance().subscribe(options);
 }
+
+export const subscribeToLatestDeployments = async (
+  projectId: string,
+  callback: LatestDeploymentsCallback
+) => {
+  return WebSocketManager.getInstance().subscribeToLatestDeployments(
+    projectId,
+    callback
+  );
+};

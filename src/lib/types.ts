@@ -45,7 +45,9 @@ export type WebSocketEventName =
   | 'ping'
   | 'pong'
   | 'subscribeToHTTPLogs'
-  | 'logs';
+  | 'logs'
+  | 'subscribeToLatestDeployments'
+  | 'latestDeployments';
 
 export type WebSocketPingEvent = {
   eventName: 'ping';
@@ -68,8 +70,22 @@ export type WebSocketLogsEvent = {
   logs: HttpLog[];
 };
 
+export type WebSocketSubscribeToLatestDeploymentsEvent = {
+  eventName: 'subscribeToLatestDeployments';
+};
+
+export type WebSocketLatestDeploymentsEvent = {
+  eventName: 'latestDeployments';
+  nodes: {
+    serviceId: string;
+    latestDeployment: Deployment;
+  }[];
+};
+
 export type WebSocketMessage =
   | WebSocketPingEvent
   | WebSocketPongEvent
   | WebSocketSubscribeToHTTPLogsEvent
-  | WebSocketLogsEvent;
+  | WebSocketLogsEvent
+  | WebSocketSubscribeToLatestDeploymentsEvent
+  | WebSocketLatestDeploymentsEvent;
