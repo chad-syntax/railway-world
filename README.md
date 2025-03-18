@@ -2,6 +2,8 @@
 
 A 3D interactive visualization tool for Railway infrastructure. This application renders your Railway services as structures in a Minecraft-inspired world and visualizes network traffic between services in real-time.
 
+This is a quick side project to re-familiarize myself with threejs and web graphics. I do not plan on maintaining this or adding much to it. In fact if I were to make this for real, I would probably try using godot.
+
 ## Features
 
 - Interactive 3D world with first-person controls (WASD + mouse look, Space/Ctrl to fly)
@@ -82,14 +84,28 @@ The application consists of:
 
 ### Project Structure
 
-- `src/main.ts`: Frontend client entry point
-- `src/server.ts`: Backend server entry point
-- `src/lib/three/`: 3D visualization components
-  - `World.ts`: Main Three.js scene management
-  - `ServiceStructure.ts`: Service visualization as 3D structures
-  - `InternetGlobe.ts`: Central globe representing external traffic
-- `src/lib/graphql/`: Railway API integration
-- `src/service-structures.ts`: Service visualization logic
+- `src/client.ts`: Frontend client entry point
+- `src/lib/`: Core library code
+  - `types.ts`: TypeScript type definitions
+  - `constants.ts`: Application constants
+  - `utils.ts`: Shared utility functions
+  - `client/`: Frontend-specific code
+    - `three/`: Three.js visualization components
+      - `World.ts`: Main Three.js scene management
+      - `ServiceStructure.ts`: Service visualization as 3D structures
+      - `InternetGlobe.ts`: Central globe representing external traffic
+      - `RequestBlock.ts`: Visualization of network requests
+      - `ConnectionLine.ts`: Network connection visualization
+      - `VolumeStructure.ts`: Volume-based service visualization
+      - `WorldObject.ts`: Base class for all 3D objects
+      - `Billboard.ts`: Base class for billboard text overlays
+      - `AuthorBillboard.ts`: Author attribution display
+      - `ProjectBillboard.ts`: Project information display
+    - `websocket.ts`: WebSocket client for real-time updates
+    - `fetch-railway-data.ts`: Railway API data fetching
+  - `server/`: Backend-specific code
+    - `graphql/`: Railway GraphQL API integration
+    - `handlers/`: API route handlers
 
 ## Development
 
