@@ -45,9 +45,9 @@ class WebSocketManager {
   private static instance: WebSocketManager;
   private ws: WebSocket | null = null;
   private isConnected = false;
-  private subscriptions = new Map<string, (data: any) => void>();
+  private subscriptions = new Map<string, Set<(data: any) => void>>();
   private connectionQueue: (() => void)[] = [];
-  private nextSubscriptionId = 1;
+  private activeSubscriptionIds = new Map<string, string>();
 
   private constructor() {
     this.setupWebSocket();
@@ -93,9 +93,20 @@ class WebSocketManager {
             break;
           case 'next':
             if (message.id && message.payload?.data?.httpLogs) {
-              const callback = this.subscriptions.get(message.id);
-              if (callback) {
-                callback(message.payload.data.httpLogs);
+              // Find the deploymentId for this subscription ID
+              for (const [
+                deploymentId,
+                subscriptionId,
+              ] of this.activeSubscriptionIds.entries()) {
+                if (subscriptionId === message.id) {
+                  const callbacks = this.subscriptions.get(deploymentId);
+                  if (callbacks) {
+                    callbacks.forEach((callback) =>
+                      callback(message.payload.data.httpLogs)
+                    );
+                  }
+                  break;
+                }
               }
             }
             break;
@@ -132,7 +143,25 @@ class WebSocketManager {
   }
 
   async subscribe(options: SubscribeToLogsOptions): Promise<() => void> {
-    const subscriptionId = String(this.nextSubscriptionId++);
+    const deploymentId = options.deploymentId;
+
+    // If we already have a subscription for this deployment, just add the callback
+    if (this.subscriptions.has(deploymentId)) {
+      const callbacks = this.subscriptions.get(deploymentId)!;
+      callbacks.add(options.onData);
+
+      return () => {
+        callbacks.delete(options.onData);
+        if (callbacks.size === 0) {
+          this.unsubscribe(deploymentId);
+        }
+      };
+    }
+
+    // Create new subscription for this deployment
+    const subscriptionId = deploymentId; // Use deploymentId as subscriptionId
+    this.activeSubscriptionIds.set(deploymentId, subscriptionId);
+    this.subscriptions.set(deploymentId, new Set([options.onData]));
 
     const subscribe = () => {
       if (!this.ws || !this.isConnected) {
@@ -185,7 +214,6 @@ class WebSocketManager {
         },
       };
 
-      this.subscriptions.set(subscriptionId, options.onData);
       this.ws?.send(JSON.stringify(subscribeMessage));
     };
 
@@ -197,16 +225,28 @@ class WebSocketManager {
     }
 
     return () => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(
-          JSON.stringify({
-            id: subscriptionId,
-            type: 'complete',
-          })
-        );
+      const callbacks = this.subscriptions.get(deploymentId);
+      if (callbacks) {
+        callbacks.delete(options.onData);
+        if (callbacks.size === 0) {
+          this.unsubscribe(deploymentId);
+        }
       }
-      this.subscriptions.delete(subscriptionId);
     };
+  }
+
+  private unsubscribe(deploymentId: string) {
+    const subscriptionId = this.activeSubscriptionIds.get(deploymentId);
+    if (subscriptionId && this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          id: subscriptionId,
+          type: 'complete',
+        })
+      );
+    }
+    this.activeSubscriptionIds.delete(deploymentId);
+    this.subscriptions.delete(deploymentId);
   }
 }
 

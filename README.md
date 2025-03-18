@@ -11,6 +11,15 @@ A 3D interactive visualization tool for Railway infrastructure. This application
 - GraphQL integration with Railway's API for fetching service data
 - Client-server architecture for real-time updates
 
+## Host your own Railway World... on Railway!
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/BcMvgp?referralCode=chad)
+
+### Required Environment Variables
+
+- `RAILWAY_WORLD_TOKEN` - Your Railway API token [token docs](https://docs.railway.com/guides/public-api#creating-a-token)
+- `RAILWAY_WORLD_PROJECT_ID` - The ID of the Railway project you want to visualize (copy from project settings)
+
 ## Getting Started
 
 ### Prerequisites
