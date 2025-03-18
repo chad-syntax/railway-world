@@ -1,5 +1,4 @@
 import Fastify from 'fastify';
-import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
@@ -22,13 +21,7 @@ const server = Fastify({
   logger: true,
 });
 
-// Register CORS
 const setupServer = async () => {
-  await server.register(cors, {
-    origin: true,
-    credentials: true,
-  });
-
   // Register WebSocket plugin
   await server.register(websocket);
 
