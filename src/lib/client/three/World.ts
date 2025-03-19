@@ -229,11 +229,6 @@ export class World {
       {} as Record<string, Service>
     );
 
-    this.wsClient.onConnect(() => {
-      this.wsClient.subscribeToHTTPLogs(deploymentIds);
-      this.wsClient.subscribeToLatestDeployments();
-    });
-
     this.wsClient.onMessage('logs', (e) => {
       const event = e as WebSocketLogsEvent;
 

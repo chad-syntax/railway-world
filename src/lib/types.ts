@@ -1,4 +1,22 @@
-import { HttpLog } from './server/graphql/subscribe-to-logs';
+export interface HttpLog {
+  requestId: string;
+  timestamp: string;
+  method: string;
+  path: string;
+  host: string;
+  httpStatus: number;
+  upstreamProto: string;
+  downstreamProto: string;
+  responseDetails: string;
+  totalDuration: number;
+  upstreamAddress: string;
+  clientUa: string;
+  upstreamRqDuration: number;
+  txBytes: number;
+  rxBytes: number;
+  srcIp: string;
+  edgeRegion: string;
+}
 
 export type Volume = {
   name: string;
@@ -41,13 +59,7 @@ export interface RailwayData {
   team: Team;
 }
 
-export type WebSocketEventName =
-  | 'ping'
-  | 'pong'
-  | 'subscribeToHTTPLogs'
-  | 'logs'
-  | 'subscribeToLatestDeployments'
-  | 'latestDeployments';
+export type WebSocketEventName = 'ping' | 'pong' | 'logs' | 'latestDeployments';
 
 export type WebSocketPingEvent = {
   eventName: 'ping';
@@ -59,19 +71,10 @@ export type WebSocketPongEvent = {
   ts: number;
 };
 
-export type WebSocketSubscribeToHTTPLogsEvent = {
-  eventName: 'subscribeToHTTPLogs';
-  deploymentIds: string[];
-};
-
 export type WebSocketLogsEvent = {
   eventName: 'logs';
   deploymentId: string;
   logs: HttpLog[];
-};
-
-export type WebSocketSubscribeToLatestDeploymentsEvent = {
-  eventName: 'subscribeToLatestDeployments';
 };
 
 export type WebSocketLatestDeploymentsEvent = {
@@ -85,7 +88,5 @@ export type WebSocketLatestDeploymentsEvent = {
 export type WebSocketMessage =
   | WebSocketPingEvent
   | WebSocketPongEvent
-  | WebSocketSubscribeToHTTPLogsEvent
   | WebSocketLogsEvent
-  | WebSocketSubscribeToLatestDeploymentsEvent
   | WebSocketLatestDeploymentsEvent;

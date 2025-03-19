@@ -200,11 +200,9 @@ export class ServiceStructure extends WorldObject {
     this.deployment = deployment;
 
     if (this.statusMesh) {
-      console.log('removing status mesh');
       this.group.remove(this.statusMesh);
     }
 
-    console.log('adding status mesh');
     this.addDeploymentInfo(deployment, this.width, this.height, this.depth);
   }
 

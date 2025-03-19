@@ -4,10 +4,10 @@
   "type": "module",
   "scripts": {
     "dev:client": "vite",
-    "dev:server": "NODE_ENV=development tsx watch server.ts",
+    "dev:server": "NODE_ENV=development tsx watch src/server.ts",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "tsc && vite build",
-    "start": "NODE_ENV=production tsx server.ts",
+    "start": "NODE_ENV=production tsx src/server.ts",
     "preview": "vite preview"
   },
   "keywords": [],

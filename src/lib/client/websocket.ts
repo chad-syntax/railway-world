@@ -2,8 +2,6 @@ import {
   WebSocketEventName,
   WebSocketMessage,
   WebSocketPingEvent,
-  WebSocketSubscribeToHTTPLogsEvent,
-  WebSocketSubscribeToLatestDeploymentsEvent,
 } from '../types';
 
 export class WebSocketClient {
@@ -15,9 +13,7 @@ export class WebSocketClient {
   > = {
     ping: [],
     pong: [],
-    subscribeToHTTPLogs: [],
     logs: [],
-    subscribeToLatestDeployments: [],
     latestDeployments: [],
   };
 
@@ -81,34 +77,6 @@ export class WebSocketClient {
       this.ws.send(JSON.stringify(pingEvent));
     } else {
       console.warn('WebSocket is not connected, cannot send ping');
-    }
-  }
-
-  public subscribeToHTTPLogs(deploymentIds: string[]) {
-    if (this.ws.readyState === WebSocket.OPEN) {
-      const subscribeToHTTPLogsEvent: WebSocketSubscribeToHTTPLogsEvent = {
-        eventName: 'subscribeToHTTPLogs',
-        deploymentIds,
-      };
-
-      this.ws.send(JSON.stringify(subscribeToHTTPLogsEvent));
-    } else {
-      console.warn('WebSocket is not connected, cannot subscribe to logs');
-    }
-  }
-
-  public subscribeToLatestDeployments() {
-    if (this.ws.readyState === WebSocket.OPEN) {
-      const subscribeToLatestDeploymentsEvent: WebSocketSubscribeToLatestDeploymentsEvent =
-        {
-          eventName: 'subscribeToLatestDeployments',
-        };
-
-      this.ws.send(JSON.stringify(subscribeToLatestDeploymentsEvent));
-    } else {
-      console.warn(
-        'WebSocket is not connected, cannot subscribe to latest deployments'
-      );
     }
   }
 
