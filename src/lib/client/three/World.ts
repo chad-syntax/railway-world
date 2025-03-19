@@ -13,9 +13,10 @@ import {
 import { VolumeStructure } from './VolumeStructure';
 import { ProjectBillboard } from './ProjectBillboard';
 import { AuthorBillboard } from './AuthorBillboard';
-import { HttpLog } from '../../server/graphql/subscribe-to-logs';
+import { HttpLog } from '../../types';
 import { WebSocketClient } from '../websocket';
 import { RequestBlock } from './RequestBlock';
+
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
   wsClient: WebSocketClient;

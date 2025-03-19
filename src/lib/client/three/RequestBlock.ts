@@ -1,5 +1,4 @@
-import { HttpLog } from '../../server/graphql/subscribe-to-logs';
-import { Service } from '../../types';
+import { Service, HttpLog } from '../../types';
 import {
   BoxGeometry,
   Mesh,

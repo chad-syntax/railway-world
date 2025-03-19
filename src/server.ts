@@ -26,7 +26,7 @@ const setupServer = async () => {
   const liveDataService = new LiveDataService();
 
   server.register(async function (fastify) {
-    fastify.get('/ws', { websocket: true }, liveDataService.onWSConnection);
+    fastify.get('/ws', { websocket: true }, liveDataService.onClientConnection);
   });
 
   // Railway data endpoint

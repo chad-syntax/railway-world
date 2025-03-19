@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { FastifyRequest } from 'fastify';
-import { WebSocketMessage, RailwayData, Deployment } from '../types';
+import { WebSocketMessage, RailwayData, Deployment, HttpLog } from '../types';
 import { GRAPHQL_WS_API_URL } from '../constants';
 import { railwayDataQuery } from './graphql/railway-data-query';
 import { gqlRequest } from './graphql/request';
@@ -8,7 +8,6 @@ import { processRailwayData } from './graphql/railway-data-query';
 import { railwayHttpLogsSubscription } from './graphql/railway-http-logs-subscription';
 import { requestLatestDeployments } from './graphql/latest-deployments-query';
 import { config } from 'dotenv';
-import { HttpLog } from './graphql/subscribe-to-logs';
 
 config();
 
@@ -119,7 +118,7 @@ export class LiveDataService {
     console.error('client error', error);
   };
 
-  onWSConnection = (socket: WebSocket.WebSocket, _: FastifyRequest) => {
+  onClientConnection = (socket: WebSocket.WebSocket, _: FastifyRequest) => {
     socket.on('message', (message) =>
       this.handleRawClientMessage(socket, message)
     );
@@ -138,18 +137,92 @@ export class LiveDataService {
   }
 
   private startListeningForData() {
-    // set up gql subscription for logs
     this.startGqlSubscriptionForLogs();
-    // set up polling for latest deployments
     this.startPollingForLatestDeployments();
   }
 
   private stopListeningForData() {
-    // stop gql subscription for logs
     this.stopGqlSubscriptionForLogs();
-    // stop polling for latest deployments
     this.stopPollingForLatestDeployments();
   }
+
+  private onGqlWsOpen = () => {
+    console.log('Connected to Railway GQL WebSocket', railwayToken);
+
+    this.gqlWs!.send(
+      JSON.stringify({
+        type: 'connection_init',
+        payload: {
+          Authorization: `Bearer ${railwayToken}`,
+        },
+      })
+    );
+  };
+
+  private onGqlWsMessage = (data: WebSocket.RawData) => {
+    try {
+      const message = JSON.parse(data.toString());
+
+      switch (message.type) {
+        case 'connection_ack':
+          console.log('Connection acknowledged');
+
+          this.railwayDataPromise.then(() => {
+            for (const deploymentId of this.deploymentIds!) {
+              const subscribeMessage = {
+                id: deploymentId,
+                type: 'subscribe',
+                payload: {
+                  query: railwayHttpLogsSubscription,
+                  variables: {
+                    deploymentId,
+                    beforeLimit: 500,
+                    beforeDate: new Date().toISOString(),
+                  },
+                },
+              };
+
+              this.gqlWs!.send(JSON.stringify(subscribeMessage));
+            }
+          });
+
+          break;
+        case 'next':
+          if (message.id && message.payload?.data?.httpLogs) {
+            const httpLogs = message.payload.data.httpLogs as HttpLog[];
+            if (httpLogs.length > 0) {
+              this.clientConnections.forEach((conn) => {
+                this.sendClientMessage(conn, {
+                  eventName: 'logs',
+                  deploymentId: message.id,
+                  logs: httpLogs,
+                });
+              });
+            }
+          }
+          break;
+        case 'error':
+          console.error(
+            'Subscription error:',
+            JSON.stringify(message.payload, null, 2)
+          );
+          break;
+        case 'complete':
+          console.log('Subscription completed');
+          break;
+      }
+    } catch (error) {
+      console.error('Error parsing message:', error);
+    }
+  };
+
+  private onGqlWsClose = (code: number, reason: Buffer) => {
+    console.log('WebSocket closed:', {
+      code,
+      reason: reason.toString(),
+      intentional: this.isIntentionalClose,
+    });
+  };
 
   private startGqlSubscriptionForLogs() {
     if (this.gqlWs) return;
@@ -160,101 +233,15 @@ export class LiveDataService {
       },
     });
 
-    this.gqlWs.on('open', () => {
-      console.log('Connected to Railway GQL WebSocket', railwayToken);
+    this.gqlWs.on('open', this.onGqlWsOpen);
 
-      this.gqlWs!.send(
-        JSON.stringify({
-          type: 'connection_init',
-          payload: {
-            Authorization: `Bearer ${railwayToken}`,
-          },
-        })
-      );
-    });
-
-    this.gqlWs.on('message', (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-
-        switch (message.type) {
-          case 'connection_ack':
-            console.log('Connection acknowledged');
-
-            this.railwayDataPromise.then(() => {
-              for (const deploymentId of this.deploymentIds!) {
-                const subscribeMessage = {
-                  id: deploymentId,
-                  type: 'subscribe',
-                  payload: {
-                    query: railwayHttpLogsSubscription,
-                    variables: {
-                      deploymentId,
-                      beforeLimit: 500,
-                      beforeDate: new Date().toISOString(),
-                    },
-                  },
-                };
-
-                this.gqlWs!.send(JSON.stringify(subscribeMessage));
-              }
-            });
-
-            break;
-          case 'next':
-            if (message.id && message.payload?.data?.httpLogs) {
-              const httpLogs = message.payload.data.httpLogs as HttpLog[];
-              if (httpLogs.length > 0) {
-                this.clientConnections.forEach((conn) => {
-                  this.sendClientMessage(conn, {
-                    eventName: 'logs',
-                    deploymentId: message.id,
-                    logs: httpLogs,
-                  });
-                });
-              }
-            }
-            break;
-          case 'error':
-            console.error(
-              'Subscription error:',
-              JSON.stringify(message.payload, null, 2)
-            );
-            break;
-          case 'complete':
-            console.log('Subscription completed');
-            break;
-        }
-      } catch (error) {
-        console.error('Error parsing message:', error);
-      }
-    });
+    this.gqlWs.on('message', this.onGqlWsMessage);
 
     this.gqlWs.on('error', (error) => {
       console.error('WebSocket error:', error);
     });
 
-    this.gqlWs.on('close', (code, reason) => {
-      console.log('WebSocket closed:', {
-        code,
-        reason: reason.toString(),
-        intentional: this.isIntentionalClose,
-      });
-      this.gqlWs = null;
-      // Only attempt to reconnect if the closure wasn't intentional
-      if (!this.isIntentionalClose && this.attempts < 3) {
-        this.attempts++;
-        this.gqlSubscriptionTimeout = setTimeout(
-          () => this.startGqlSubscriptionForLogs(),
-          5000
-        );
-      }
-      if (this.attempts >= 3) {
-        console.error('Failed to connect to Railway GQL WebSocket');
-        this.stopGqlSubscriptionForLogs();
-      }
-      this.isIntentionalClose = false;
-    });
+    this.gqlWs.on('close', this.onGqlWsClose);
   }
 
   private startPollingForLatestDeployments() {
@@ -267,6 +254,8 @@ export class LiveDataService {
         latestDeploymentsData.project.environments.edges.flatMap((edge) =>
           edge.node.serviceInstances.edges.map((instance) => instance.node)
         );
+
+      // TODO - update the deploymentIds and subscriptions when a new deploy happens
 
       if (
         JSON.stringify(this.latestDeployments) !==
