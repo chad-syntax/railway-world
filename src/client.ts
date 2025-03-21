@@ -10,9 +10,9 @@ const $loadingSpinner = document.getElementById('loading-spinner')!;
 const run = (railwayData: RailwayData) => {
   const wsClient = new WebSocketClient();
 
-  const world = new World({ htmlRoot: $root, wsClient });
+  const world = new World({ htmlRoot: $root, wsClient, railwayData });
 
-  world.populate(railwayData);
+  // world.populate(railwayData);
 
   // Start animation loop
   let prevTime = performance.now();

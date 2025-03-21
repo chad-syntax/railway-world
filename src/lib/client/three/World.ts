@@ -7,8 +7,8 @@ import { ConnectionLine, ConnectionPoint } from './ConnectionLine';
 import {
   RailwayData,
   Service,
-  WebSocketLogsEvent,
   WebSocketLatestDeploymentsEvent,
+  WebSocketLogsEvent,
 } from '../../types';
 import { VolumeStructure } from './VolumeStructure';
 import { ProjectBillboard } from './ProjectBillboard';
@@ -16,17 +16,33 @@ import { AuthorBillboard } from './AuthorBillboard';
 import { HttpLog } from '../../types';
 import { WebSocketClient } from '../websocket';
 import { RequestBlock } from './RequestBlock';
+import {
+  WORLD_SKY_BLUE,
+  WORLD_LIGHT_GRAY,
+  UI_WHITE,
+  WORLD_GRASS_GREEN,
+  WORLD_ORANGE,
+  CONNECTION_BLUE,
+} from '../../../lib/colors';
 
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
   wsClient: WebSocketClient;
+  railwayData: RailwayData;
 };
 
 export class World {
+  public objects: Map<string, WorldObject> = new Map();
+  public wsClient: WebSocketClient;
+  public railwayData: RailwayData;
+  public serviceStructures: Map<string, ServiceStructure> = new Map();
+  public volumes: Map<string, VolumeStructure> = new Map();
+  public globes: Map<string, InternetGlobe> = new Map();
+  public requestBlocks: Map<string, RequestBlock> = new Map();
+
+  private scene: THREE.Scene;
   private htmlRoot: HTMLElement;
-  protected wsClient: WebSocketClient;
   private populated: boolean = false;
-  public scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private ambientLight: THREE.AmbientLight;
@@ -49,16 +65,14 @@ export class World {
   private SPEED = 30.0;
   private JUMP_SPEED = 15.0;
 
-  public objects: Map<string, WorldObject> = new Map();
-
   constructor(options: WorldConstructorOptions) {
-    const { htmlRoot, wsClient } = options;
+    const { htmlRoot, wsClient, railwayData } = options;
 
     this.htmlRoot = htmlRoot;
     this.wsClient = wsClient;
-
+    this.railwayData = railwayData;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb);
+    this.scene.background = new THREE.Color(WORLD_SKY_BLUE);
     this.camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
@@ -73,10 +87,10 @@ export class World {
     this.htmlRoot.appendChild(this.renderer.domElement);
 
     // Add basic lighting
-    this.ambientLight = new THREE.AmbientLight(0x909090, 1.2);
+    this.ambientLight = new THREE.AmbientLight(WORLD_LIGHT_GRAY, 1.2);
     this.scene.add(this.ambientLight);
 
-    this.directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    this.directionalLight = new THREE.DirectionalLight(UI_WHITE, 1.2);
     this.directionalLight.position.set(1, 1, 1);
     this.directionalLight.castShadow = true;
     this.directionalLight.shadow.mapSize.width = 1024;
@@ -89,7 +103,7 @@ export class World {
     this.ground = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
       new THREE.MeshStandardMaterial({
-        color: 0x4caf50, // Grass green color
+        color: WORLD_GRASS_GREEN, // Grass green color
         side: THREE.DoubleSide,
       })
     );
@@ -129,10 +143,79 @@ export class World {
 
     // Handle window resize
     window.addEventListener('resize', this.onResize);
+
+    this.wsClient.onMessage('logs', this.handleLogs);
+    this.wsClient.onMessage('latestDeployments', this.handleLatestDeployments);
+
+    this.populate();
   }
 
+  private handleLogs = (event: WebSocketLogsEvent) => {
+    const targetService = this.railwayData.services.find(
+      (service) => service.latestDeployment.id === event.deploymentId
+    );
+
+    if (!targetService) {
+      console.error('Service not found for logs', event.deploymentId);
+      return;
+    }
+
+    this.populateRequest(targetService, event.logs);
+  };
+
+  private handleLatestDeployments = (
+    event: WebSocketLatestDeploymentsEvent
+  ) => {
+    event.nodes.forEach((node) => {
+      const service = this.railwayData.services.find(
+        (service) => service.id === node.serviceId
+      );
+      if (service) {
+        service.latestDeployment = node.latestDeployment;
+      }
+    });
+  };
+
   public addObject(object: WorldObject) {
+    this.scene.add(object.group);
     this.objects.set(object.id, object);
+    // determine the type of the object and add it to the appropriate map
+    if (object instanceof ServiceStructure) {
+      this.serviceStructures.set(object.service.id, object);
+    }
+    if (object instanceof VolumeStructure) {
+      this.volumes.set(object.volume.id, object);
+    }
+    if (object instanceof InternetGlobe) {
+      this.globes.set(object.serviceId, object);
+      object.domains.forEach((domain) => {
+        this.globes.set(domain, object);
+      });
+    }
+    if (object instanceof RequestBlock) {
+      this.requestBlocks.set(object.service.id, object);
+    }
+  }
+
+  public removeObject(object: WorldObject) {
+    this.scene.remove(object.group);
+    this.objects.delete(object.id);
+    // determine the type of the object and remove it from the appropriate map
+    if (object instanceof ServiceStructure) {
+      this.serviceStructures.delete(object.service.id);
+    }
+    if (object instanceof VolumeStructure) {
+      this.volumes.delete(object.volume.id);
+    }
+    if (object instanceof InternetGlobe) {
+      this.globes.delete(object.serviceId);
+      object.domains.forEach((domain) => {
+        this.globes.delete(domain);
+      });
+    }
+    if (object instanceof RequestBlock) {
+      this.requestBlocks.delete(object.service.id);
+    }
   }
 
   public renderLoop(delta: number) {
@@ -151,26 +234,18 @@ export class World {
   };
 
   public populateRequest(service: Service, logs: HttpLog[]) {
-    // find the connecting line for the service
-    // so that means we first find the service structure for the service
-    // then we fine the connecting line for the service structure
-    // then we use the connecting line to position the request block
-
-    const allObjects = Array.from(this.objects.values());
-    const serviceStructure = allObjects.find(
-      (obj) => obj instanceof ServiceStructure && obj.service.id === service.id
-    );
+    const serviceStructure = this.serviceStructures.get(service.id);
 
     if (!serviceStructure) {
       console.error('Service structure not found for service', service.name);
       return;
     }
 
-    const connectionLine = allObjects.find(
-      (obj) =>
-        obj instanceof ConnectionLine &&
-        obj.endPoint.worldObject.id === serviceStructure.id &&
-        obj.startPoint.worldObject instanceof InternetGlobe
+    const connectionLine = Array.from(this.objects.values()).find(
+      (object) =>
+        object instanceof ConnectionLine &&
+        object.endPoint.worldObject.id === serviceStructure.id &&
+        object.startPoint.worldObject instanceof InternetGlobe
     );
 
     if (!connectionLine) {
@@ -215,56 +290,8 @@ export class World {
     });
   }
 
-  public populate(railwayData: RailwayData) {
-    console.log(JSON.stringify(railwayData, null, 2));
-
-    const deploymentIds = railwayData.services
-      .filter((service) => service.domains.length > 0) // if the service has a domain, it will have http logs
-      .map((service) => service.latestDeployment.id);
-
-    const deploymentToServiceMap = railwayData.services.reduce(
-      (acc, service) => {
-        acc[service.latestDeployment.id] = service;
-        return acc;
-      },
-      {} as Record<string, Service>
-    );
-
-    this.wsClient.onMessage('logs', (e) => {
-      const event = e as WebSocketLogsEvent;
-
-      const service = deploymentToServiceMap[event.deploymentId];
-      if (!service) {
-        console.error('Service not found for deployment', event.deploymentId);
-        return;
-      }
-
-      if (event.logs.length > 0) {
-        this.populateRequest(service, event.logs);
-      }
-    });
-
-    this.wsClient.onMessage('latestDeployments', (e) => {
-      const event = e as WebSocketLatestDeploymentsEvent;
-
-      // console.log('received latest deployments', event.nodes);
-
-      // iterate over event.nodes and update the latest deployment for the service
-      event.nodes.forEach((node) => {
-        // find the service structure for the service
-        this.objects.forEach((obj) => {
-          if (obj instanceof ServiceStructure) {
-            if (
-              (obj as ServiceStructure).service.id === node.serviceId &&
-              (obj as ServiceStructure).deployment.status !==
-                node.latestDeployment.status
-            ) {
-              (obj as ServiceStructure).updateDeployment(node.latestDeployment);
-            }
-          }
-        });
-      });
-    });
+  public populate() {
+    console.log(JSON.stringify(this.railwayData, null, 2));
 
     // Create the billboard
     const billboard = new ProjectBillboard({
@@ -273,11 +300,11 @@ export class World {
       position: {
         x: 0,
         y: 20, // 20 units up in the sky
-        z: -45, // At the edge of the ground area (which is 100x100)
+        z: -50, // At the edge of the ground area (which is 100x100)
       },
-      projectName: railwayData.projectName,
-      updatedAt: railwayData.updatedAt,
-      team: railwayData.team,
+      projectName: this.railwayData.projectName,
+      updatedAt: this.railwayData.updatedAt,
+      team: this.railwayData.team,
     });
 
     this.addObject(billboard);
@@ -288,13 +315,13 @@ export class World {
       position: {
         x: billboard.BILLBOARD_WIDTH / 2 + 6,
         y: 20, // 20 units up in the sky
-        z: -45, // At the edge of the ground area (which is 100x100)
+        z: -50, // At the edge of the ground area (which is 100x100)
       },
     });
 
     this.addObject(authorBillboard);
-    // Use the services array directly from the data
-    const services = railwayData.services;
+
+    const services = this.railwayData.services;
 
     // Calculate layout parameters
     const spacing = 7.5; // Space between serviceStructures
@@ -339,10 +366,9 @@ export class World {
 
         // Add the volume to the world
         this.addObject(volumeStructure);
-
         // Create a connection between the service and volume
         this.createConnectionBetween(serviceStructure, volumeStructure, {
-          color: 0xffaa00, // Orange for service-to-volume connections
+          color: WORLD_ORANGE, // Orange for service-to-volume connections
         });
       }
 
@@ -372,30 +398,18 @@ export class World {
         this.createConnectionBetween(globe, serviceStructure, {});
       }
 
-      // Handle connections within the same loop
       if (service.connections && service.connections.length > 0) {
-        for (const targetId of service.connections) {
-          // Find the source and target serviceStructures
-          let sourceServiceStructure: WorldObject | undefined =
-            serviceStructure;
-          let targetServiceStructure: WorldObject | undefined;
-
-          // Find the target service structure
-          this.objects.forEach((obj) => {
-            if (obj instanceof ServiceStructure) {
-              if ((obj as any).service.id === targetId) {
-                targetServiceStructure = obj;
-              }
-            }
-          });
+        for (const targetServiceId of service.connections) {
+          const targetServiceStructure =
+            this.serviceStructures.get(targetServiceId);
 
           // Create a connection if the target serviceStructure exists
           if (targetServiceStructure) {
             this.createConnectionBetween(
-              sourceServiceStructure,
+              serviceStructure,
               targetServiceStructure,
               {
-                color: 0x4caf50, // Green for service-to-service connections
+                color: WORLD_GRASS_GREEN, // Green for service-to-service connections
               }
             );
           }
@@ -554,7 +568,7 @@ export class World {
       startPoint,
       endPoint,
       lineRadius: options.lineRadius || 0.02,
-      color: options.color || 0x3498db,
+      color: options.color || CONNECTION_BLUE,
     });
 
     // Add the connection to the world's objects
@@ -574,7 +588,7 @@ export class World {
   ): ConnectionLine {
     return this.createConnectionBetween(serviceStructureA, serviceStructureB, {
       lineRadius: options.lineRadius || 0.02,
-      color: options.color || 0x4caf50, // Default green for serviceStructure connections
+      color: options.color || WORLD_GRASS_GREEN, // Default green for serviceStructure connections
     });
   }
 

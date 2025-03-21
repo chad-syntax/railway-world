@@ -2,6 +2,14 @@ import * as THREE from 'three';
 import { Volume } from '../../types';
 import { World } from './World';
 import { WorldObject, Position } from './WorldObject';
+import {
+  VOLUME_LIGHT_GRAY,
+  VOLUME_RED,
+  VOLUME_YELLOW,
+  VOLUME_GREEN,
+  VOLUME_BLACK,
+  UI_WHITE_HEX,
+} from '../../../lib/colors';
 
 type VolumeStructureOptions = {
   name: string;
@@ -11,8 +19,8 @@ type VolumeStructureOptions = {
 };
 
 export class VolumeStructure extends WorldObject {
-  private volume: Volume;
-  private color: number = 0xc3c3c3;
+  public volume: Volume;
+  private color: number = VOLUME_LIGHT_GRAY;
   private usage: number = 0;
   private width: number = 1;
   private height: number = 1;
@@ -29,7 +37,11 @@ export class VolumeStructure extends WorldObject {
 
     this.usage = this.volume.currentSizeMB / this.volume.sizeMB;
     this.color =
-      this.usage > 0.8 ? 0xff0000 : this.usage > 0.5 ? 0xffff00 : 0x00ff00;
+      this.usage > 0.8
+        ? VOLUME_RED
+        : this.usage > 0.5
+        ? VOLUME_YELLOW
+        : VOLUME_GREEN;
 
     this.createVolume();
     this.addVolumeIcon();
@@ -53,7 +65,7 @@ export class VolumeStructure extends WorldObject {
     // Create wireframe cube
     const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
     const wireframeMaterial = new THREE.MeshStandardMaterial({
-      color: 0x000000,
+      color: VOLUME_BLACK,
       wireframe: true,
       wireframeLinewidth: 2,
       transparent: true,
@@ -68,7 +80,7 @@ export class VolumeStructure extends WorldObject {
 
     const innerGeometry = new THREE.BoxGeometry(
       this.width,
-      innerHeight,
+      innerHeight + 0.001,
       this.depth
     );
 
@@ -91,7 +103,7 @@ export class VolumeStructure extends WorldObject {
       usageTextCanvas.height
     );
     usageTextContext.font = 'bold 128px Arial';
-    usageTextContext.fillStyle = '#ffffff';
+    usageTextContext.fillStyle = UI_WHITE_HEX;
     usageTextContext.textAlign = 'center';
     usageTextContext.textBaseline = 'middle';
 
@@ -125,7 +137,7 @@ export class VolumeStructure extends WorldObject {
 
     // Position on top face of the inner volume cube
     const innerTopPosition = (innerHeight - this.height) / 2 + innerHeight / 2;
-    usageTextMesh.position.set(0, innerTopPosition + 0.001, 0); // Small offset to prevent z-fighting
+    usageTextMesh.position.set(0, innerTopPosition + 0.002, 0); // Small offset to prevent z-fighting
     usageTextMesh.rotation.x = -Math.PI / 2; // Rotate to lay flat on top
     this.group.add(usageTextMesh);
 
@@ -135,7 +147,6 @@ export class VolumeStructure extends WorldObject {
     this.group.add(this.innerVolumeMesh);
 
     this.group.position.set(this.position.x, this.position.y, this.position.z);
-    this.world.scene.add(this.group);
   }
 
   private addVolumeIcon(): void {

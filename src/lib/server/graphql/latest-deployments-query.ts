@@ -10,6 +10,14 @@ query LatestDeployments($id: String!) {
             edges {
               node {
                 serviceId
+                domains {
+                  customDomains {
+                    domain
+                  }
+                  serviceDomains {
+                    domain
+                  }
+                }
                 latestDeployment {
                   id
                   status
@@ -25,7 +33,7 @@ query LatestDeployments($id: String!) {
 }
 `;
 
-type LatestDeploymentsResponse = {
+export type LatestDeploymentsResponse = {
   project: {
     environments: {
       edges: {
@@ -34,6 +42,14 @@ type LatestDeploymentsResponse = {
             edges: {
               node: {
                 serviceId: string;
+                domains: {
+                  customDomains: {
+                    domain: string;
+                  }[];
+                  serviceDomains: {
+                    domain: string;
+                  }[];
+                };
                 latestDeployment: {
                   id: string;
                   status: string;

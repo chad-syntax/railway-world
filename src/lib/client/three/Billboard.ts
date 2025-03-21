@@ -27,9 +27,6 @@ export abstract class Billboard extends WorldObject {
 
     // Position the billboard group at the specified height
     this.group.position.set(this.position.x, this.position.y, this.position.z);
-
-    // Add the group to the scene
-    this.world.scene.add(this.group);
   }
 
   private createBillboardStructure(): void {

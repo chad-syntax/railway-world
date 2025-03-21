@@ -1,17 +1,18 @@
 import {
-  WebSocketEventName,
-  WebSocketMessage,
+  ClientWebSocketEventName,
+  ClientWebSocketMessage,
+  EventNameToMessageMap,
   WebSocketPingEvent,
 } from '../types';
 
 export class WebSocketClient {
   private ws: WebSocket;
-  private onConnectEventListeners: (() => void)[] = [];
-  private messageListeners: Record<
-    WebSocketEventName,
-    ((event: WebSocketMessage) => void)[]
-  > = {
-    ping: [],
+
+  private eventListeners: {
+    [K in ClientWebSocketEventName]: ((
+      event: EventNameToMessageMap<K>
+    ) => void)[];
+  } = {
     pong: [],
     logs: [],
     latestDeployments: [],
@@ -22,49 +23,54 @@ export class WebSocketClient {
     const wsUrl = `${protocol}//${window.location.host}/ws`;
 
     this.ws = new WebSocket(wsUrl);
-
-    this.ws.onopen = () => {
-      console.log('Connected to WebSocket server');
-      this.onConnectEventListeners.forEach((callback) => callback());
-    };
-
-    this.ws.onclose = () => {
-      console.log('Disconnected from WebSocket server');
-    };
-
-    this.ws.onmessage = (event) => {
-      let parsedMessage: WebSocketMessage;
-      try {
-        parsedMessage = JSON.parse(event.data);
-      } catch (error) {
-        console.error('Error parsing message:', error);
-        console.log('Received message:', event.data);
-        return;
-      }
-
-      this.handleMessage(parsedMessage);
-    };
-
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+    this.addEventListener('message', this.handleMessage);
   }
 
-  public onConnect(callback: () => void) {
-    this.onConnectEventListeners.push(callback);
-  }
-
-  public onMessage(
-    eventName: WebSocketEventName,
-    callback: (event: WebSocketMessage) => void
+  public addEventListener(
+    type: keyof WebSocketEventMap,
+    callback: (event: WebSocketEventMap[keyof WebSocketEventMap]) => void
   ) {
-    this.messageListeners[eventName].push(callback);
+    this.ws.addEventListener(type, callback);
   }
 
-  private handleMessage(event: WebSocketMessage) {
-    this.messageListeners[event.eventName].forEach((callback) =>
-      callback(event)
-    );
+  public removeEventListener(
+    type: keyof WebSocketEventMap,
+    callback: (event: WebSocketEventMap[keyof WebSocketEventMap]) => void
+  ) {
+    this.ws.removeEventListener(type, callback);
+  }
+
+  private handleMessage = (event: WebSocketEventMap['message'] | Event) => {
+    if (!(event instanceof MessageEvent)) return;
+
+    let parsedMessage: ClientWebSocketMessage;
+    try {
+      parsedMessage = JSON.parse(event.data);
+    } catch (error) {
+      console.error('Error parsing message:', error);
+      console.log('Received message:', event.data);
+      return;
+    }
+
+    const { eventName } = parsedMessage;
+    // Type assertion here is safe because we know the event matches the listener type
+    (
+      this.eventListeners[eventName] as ((
+        event: typeof parsedMessage
+      ) => void)[]
+    ).forEach((callback) => callback(parsedMessage));
+  };
+
+  public onMessage<T extends ClientWebSocketEventName>(
+    eventName: T,
+    callback: (event: EventNameToMessageMap<T>) => void
+  ) {
+    // Type assertion needed because TypeScript cannot infer that the eventName matches the callback event type
+    (
+      this.eventListeners[eventName] as ((
+        event: EventNameToMessageMap<T>
+      ) => void)[]
+    ).push(callback);
   }
 
   public sendPing() {

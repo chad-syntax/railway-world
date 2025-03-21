@@ -2,6 +2,7 @@ import { Billboard } from './Billboard';
 import { World } from './World';
 import { Position } from './WorldObject';
 import * as THREE from 'three';
+import { UI_WHITE_HEX } from '../../../lib/colors';
 
 type AuthorBillboardConstructorOptions = {
   name: string;
@@ -32,7 +33,7 @@ export class AuthorBillboard extends Billboard {
 
     // Configure text settings
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = UI_WHITE_HEX;
 
     // Draw title
     ctx.font = '112px monospace';

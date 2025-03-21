@@ -14,5 +14,12 @@ export const gqlRequest = async (
     body: JSON.stringify({ query, variables }),
   });
 
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `GraphQL request failed: ${response.statusText}\n\n${errorText}`
+    );
+  }
+
   return response.json();
 };

@@ -9,6 +9,14 @@ import {
 } from 'three';
 import { Position, WorldObject } from './WorldObject';
 import { World } from './World';
+import {
+  STATUS_SUCCESS,
+  STATUS_WARNING,
+  STATUS_ERROR_LIGHT,
+  STATUS_ERROR,
+  STATUS_NEUTRAL,
+  UI_WHITE_HEX,
+} from '../../../lib/colors';
 
 type RequestBlockOptions = {
   service: Service;
@@ -100,9 +108,6 @@ export class RequestBlock extends WorldObject {
 
     this.group.position.set(this.position.x, this.position.y, this.position.z);
 
-    // Add the group to the scene
-    this.world.scene.add(this.group);
-
     this.startTime = null;
     this.animationComplete = false;
     this.waitStartTime = null;
@@ -130,7 +135,7 @@ export class RequestBlock extends WorldObject {
   private createTextTexture(
     text: string,
     size: number = 128,
-    color: number
+    baseColor: number
   ): CanvasTexture {
     // Create a canvas to render the text
     const canvas = document.createElement('canvas');
@@ -141,9 +146,9 @@ export class RequestBlock extends WorldObject {
     canvas.height = size;
 
     // Convert hex color to rgba string
-    const r = (color >> 16) & 255;
-    const g = (color >> 8) & 255;
-    const b = color & 255;
+    const r = (baseColor >> 16) & 255;
+    const g = (baseColor >> 8) & 255;
+    const b = baseColor & 255;
     const fillColor = `rgba(${r}, ${g}, ${b}, 1.0)`;
 
     // Clear the canvas
@@ -163,7 +168,7 @@ export class RequestBlock extends WorldObject {
     context.shadowOffsetY = 2;
 
     // Draw text
-    context.fillStyle = '#ffffff';
+    context.fillStyle = UI_WHITE_HEX;
     context.fillText(text, size / 2, size / 2);
 
     // Create a texture from the canvas
@@ -191,15 +196,15 @@ export class RequestBlock extends WorldObject {
     let baseColor;
 
     if (status >= 200 && status < 300) {
-      baseColor = 0x42f54b; // Green for 2xx (success)
+      baseColor = STATUS_SUCCESS; // Green for 2xx (success)
     } else if (status >= 300 && status < 400) {
-      baseColor = 0xf5a742; // Orange for 3xx (redirection)
+      baseColor = STATUS_WARNING; // Orange for 3xx (redirection)
     } else if (status >= 400 && status < 500) {
-      baseColor = 0xff6b6b; // Light red for 4xx (client errors)
+      baseColor = STATUS_ERROR_LIGHT; // Light red for 4xx (client errors)
     } else if (status >= 500) {
-      baseColor = 0xcc0000; // Dark red for 5xx (server errors)
+      baseColor = STATUS_ERROR; // Dark red for 5xx (server errors)
     } else {
-      baseColor = 0xcccccc; // Gray for unknown status codes
+      baseColor = STATUS_NEUTRAL; // Gray for unknown status codes
     }
 
     // Create text texture
@@ -287,8 +292,7 @@ export class RequestBlock extends WorldObject {
         if (waitElapsed > 1.0) {
           // Wait 1 second before removal
           // Remove from scene and world's objects map
-          this.world.scene.remove(this.group);
-          this.world.objects.delete(this.id);
+          this.world.removeObject(this);
         }
       }
     }

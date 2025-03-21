@@ -163,6 +163,7 @@ export function processRailwayData(rawData: any): RailwayData {
 
     if (service) {
       service.volume = {
+        id: volume.id,
         name: volume.volume.name,
         currentSizeMB: volume.currentSizeMB,
         sizeMB: volume.sizeMB,

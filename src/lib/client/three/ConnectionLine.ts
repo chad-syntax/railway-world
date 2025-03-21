@@ -47,9 +47,6 @@ export class ConnectionLine extends WorldObject {
 
     // Create the connection line once
     this.initConnectionLine();
-
-    // Add the group to the scene
-    this.world.scene.add(this.group);
   }
 
   private initConnectionLine(): void {
@@ -155,8 +152,6 @@ export class ConnectionLine extends WorldObject {
     }
 
     this.tubeMaterial.dispose();
-
-    this.world.scene.remove(this.group);
   }
 
   // Get the world position of the start point

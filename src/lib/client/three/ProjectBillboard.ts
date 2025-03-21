@@ -3,6 +3,12 @@ import { World } from './World';
 import { Position } from './WorldObject';
 import * as THREE from 'three';
 import { Team } from '../../types';
+import {
+  UI_DARK_BLUE_GRAY_HEX,
+  UI_WHITE_HEX,
+  UI_LIGHT_GRAY_HEX,
+} from '../../../lib/colors';
+
 type ProjectBillboardConstructorOptions = {
   name: string;
   world: World;
@@ -68,7 +74,7 @@ export class ProjectBillboard extends Billboard {
       canvas.height = 1024;
 
       // Fill background (matching the panel color but slightly lighter)
-      ctx.fillStyle = '#2b2d42';
+      ctx.fillStyle = UI_DARK_BLUE_GRAY_HEX;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Load Railway icon
@@ -85,7 +91,7 @@ export class ProjectBillboard extends Billboard {
 
       // Configure text settings
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = UI_WHITE_HEX;
 
       // Draw project name
       ctx.font = '112px monospace';
@@ -93,12 +99,12 @@ export class ProjectBillboard extends Billboard {
 
       // draw team label
       ctx.font = '80px monospace';
-      ctx.fillStyle = '#c3c3c3';
+      ctx.fillStyle = UI_LIGHT_GRAY_HEX;
       ctx.fillText('Team', canvas.width * 0.23, canvas.height * 0.48);
 
       // draw team name
       ctx.font = '80px monospace';
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = UI_WHITE_HEX;
       ctx.fillText(this.team.name, canvas.width * 0.23, canvas.height * 0.58);
 
       // draw team avatar
@@ -116,7 +122,7 @@ export class ProjectBillboard extends Billboard {
       ctx.closePath();
 
       // Add a white border around the circle
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = UI_WHITE_HEX;
       ctx.lineWidth = 4;
       ctx.stroke();
 
@@ -140,7 +146,7 @@ export class ProjectBillboard extends Billboard {
       })}`;
 
       ctx.font = '36px monospace';
-      ctx.fillStyle = '#c3c3c3';
+      ctx.fillStyle = UI_LIGHT_GRAY_HEX;
       ctx.fillText(updatedAtText, canvas.width * 0.23, canvas.height * 0.85);
 
       // Create texture from canvas

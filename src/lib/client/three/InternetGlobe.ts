@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ServiceStructure } from './ServiceStructure';
 import { World } from './World';
 import { WorldObject, Position } from './WorldObject';
+import { CONNECTION_BLUE, UI_WHITE } from '../../../lib/colors';
 
 type InternetGlobeConstructorOptions = {
   name: string;
@@ -13,13 +14,13 @@ type InternetGlobeConstructorOptions = {
 };
 
 export class InternetGlobe extends WorldObject {
+  public domains: string[];
+  public serviceId: string;
+
   private globe!: THREE.Mesh; // Using the definite assignment assertion
   private domainText: THREE.Object3D[] = [];
-  private domains: string[];
   private globeRadius = 1.5;
   private globeHeight = 1.5; // Equal to globeRadius so bottom of globe rests on ground level
-
-  public serviceId: string;
 
   constructor(options: InternetGlobeConstructorOptions) {
     super(options);
@@ -38,9 +39,6 @@ export class InternetGlobe extends WorldObject {
     // Position the globe at ground level
     this.group.position.set(this.position.x, this.globeHeight, this.position.z);
 
-    // Add the group to the scene
-    this.world.scene.add(this.group);
-
     // Create sprite text above the globe
     this.createLabel('Internet', {
       x: 0,
@@ -55,9 +53,9 @@ export class InternetGlobe extends WorldObject {
 
     // Create a material with wireframe to look like the "World Wide Web" icon
     const material = new THREE.MeshStandardMaterial({
-      color: 0x3498db, // Blue color
+      color: CONNECTION_BLUE, // Blue color
       wireframe: true, // Make it a wireframe
-      emissive: 0x3498db, // Add a slight glow
+      emissive: CONNECTION_BLUE, // Add a slight glow
       emissiveIntensity: 0.8,
       transparent: true,
       opacity: 0.8,
@@ -70,7 +68,7 @@ export class InternetGlobe extends WorldObject {
       32
     );
     const innerMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: UI_WHITE,
       transparent: true,
       opacity: 0.8,
     });

@@ -19,6 +19,7 @@ export interface HttpLog {
 }
 
 export type Volume = {
+  id: string;
   name: string;
   currentSizeMB: number;
   sizeMB: number;
@@ -61,6 +62,8 @@ export interface RailwayData {
 
 export type WebSocketEventName = 'ping' | 'pong' | 'logs' | 'latestDeployments';
 
+export type ClientWebSocketEventName = Exclude<WebSocketEventName, 'ping'>;
+
 export type WebSocketPingEvent = {
   eventName: 'ping';
   ts: number;
@@ -77,12 +80,14 @@ export type WebSocketLogsEvent = {
   logs: HttpLog[];
 };
 
+export type LatestDeployment = {
+  serviceId: string;
+  latestDeployment: Deployment;
+};
+
 export type WebSocketLatestDeploymentsEvent = {
   eventName: 'latestDeployments';
-  nodes: {
-    serviceId: string;
-    latestDeployment: Deployment;
-  }[];
+  nodes: LatestDeployment[];
 };
 
 export type WebSocketMessage =
@@ -90,3 +95,15 @@ export type WebSocketMessage =
   | WebSocketPongEvent
   | WebSocketLogsEvent
   | WebSocketLatestDeploymentsEvent;
+
+export type ClientWebSocketMessage = Exclude<
+  WebSocketMessage,
+  WebSocketPingEvent
+>;
+
+export type EventNameToMessageMap<T extends ClientWebSocketEventName> = {
+  ping: WebSocketPingEvent;
+  pong: WebSocketPongEvent;
+  logs: WebSocketLogsEvent;
+  latestDeployments: WebSocketLatestDeploymentsEvent;
+}[T];
