@@ -16,6 +16,7 @@ import {
   requestLatestDeployments,
 } from './graphql/latest-deployments-query';
 import { config } from 'dotenv';
+import { mockLatestDeployments } from '../mock-data';
 
 config();
 
@@ -242,20 +243,30 @@ export class LiveDataService {
   };
 
   private onGqlWsClose = (code: number, reason: Buffer) => {
+    const reasonStr = reason.toString();
+    const isDeadlineExceeded = reasonStr === 'deadline_exceeded';
+
     console.log('WebSocket closed:', {
       code,
-      reason: reason.toString(),
+      reason: reasonStr,
       intentional: this.isIntentionalClose,
     });
 
     if (this.attempts < 3) {
       console.log('Attempting to reconnect to Railway GQL WebSocket...');
-      this.attempts++;
+      if (!this.isIntentionalClose && !isDeadlineExceeded) {
+        this.attempts++;
+      }
+
+      const retryTimeoutMs = isDeadlineExceeded
+        ? 20 * 1000 // longer timeout for deadline exceeded, want to avoid rate limiting issues
+        : (this.attempts || 1) * 5000;
+
       this.gqlSubscriptionTimeout = setTimeout(() => {
         this.gqlWs = null;
         this.gqlDeploymentSubscriptions.clear();
         this.startGqlSubscriptionForLogs();
-      }, 5000);
+      }, retryTimeoutMs);
     } else {
       console.error('Failed to connect to Railway GQL WebSocket');
       this.stopGqlSubscriptionForLogs();
@@ -285,13 +296,18 @@ export class LiveDataService {
   private startPollingForLatestDeployments() {
     this.latestDeploymentsInterval = setInterval(async () => {
       let latestDeploymentsData: LatestDeploymentsResponse;
-      try {
-        latestDeploymentsData = await requestLatestDeployments(
-          railwayProjectId
-        );
-      } catch (error) {
-        console.error('Error polling for latest deployments:', error);
-        return;
+
+      if (process.env.MOCK_DATA !== 'true') {
+        try {
+          latestDeploymentsData = await requestLatestDeployments(
+            railwayProjectId
+          );
+        } catch (error) {
+          console.error('Error polling for latest deployments:', error);
+          return;
+        }
+      } else {
+        latestDeploymentsData = mockLatestDeployments;
       }
 
       const latestDeployments =
@@ -300,8 +316,9 @@ export class LiveDataService {
         );
 
       if (
+        process.env.MOCK_DATA === 'true' ||
         JSON.stringify(this.latestDeployments) !==
-        JSON.stringify(latestDeployments)
+          JSON.stringify(latestDeployments)
       ) {
         const newHttpDeploymentIds = latestDeployments
           .filter(

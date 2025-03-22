@@ -35,9 +35,24 @@ export type Team = {
   avatar: string;
 };
 
+export type DeploymentStatus =
+  | 'BUILDING'
+  | 'CRASHED'
+  | 'DEPLOYING'
+  | 'FAILED'
+  | 'INITIALIZING'
+  | 'NEEDS_APPROVAL'
+  | 'QUEUED'
+  | 'REMOVED'
+  | 'REMOVING'
+  | 'SKIPPED'
+  | 'SLEEPING'
+  | 'SUCCESS'
+  | 'WAITING';
+
 export type Deployment = {
   id: string;
-  status: string;
+  status: DeploymentStatus;
   updatedAt: string;
 };
 

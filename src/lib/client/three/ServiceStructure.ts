@@ -6,6 +6,7 @@ import {
   Service,
   Deployment,
   WebSocketLatestDeploymentsEvent,
+  DeploymentStatus,
 } from '../../types';
 import {
   SERVICE_NODEJS,
@@ -19,6 +20,7 @@ import {
   STATUS_DEFAULT_HEX,
   VOLUME_BLACK_HEX,
   UI_WHITE_HEX,
+  LIGHT_STEEL_BLUE_HEX,
 } from '../../../lib/colors';
 
 const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
@@ -31,6 +33,29 @@ const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
 } as const;
 
 type ServiceStructureTypeColors = keyof typeof SERVICE_STRUCTURE_TYPE_COLORS;
+
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  postgres: 'SQL DB',
+  postgresql: 'SQL DB',
+  redis: 'MEM DB',
+  default: 'SVC',
+} as const;
+
+const DEPLOYMENT_STATUS_EMOJI: Record<DeploymentStatus, string> = {
+  BUILDING: '🏗️',
+  CRASHED: '💥',
+  DEPLOYING: '🚀',
+  FAILED: '❌',
+  INITIALIZING: '🔄',
+  NEEDS_APPROVAL: '⛔',
+  QUEUED: '⏳',
+  REMOVED: '🗑️',
+  REMOVING: '⚠️🗑️',
+  SKIPPED: '⏭️',
+  SLEEPING: '😴',
+  SUCCESS: '✅',
+  WAITING: '⌛',
+} as const;
 
 type ServiceStructureConstructorOptions = {
   name: string;
@@ -54,6 +79,21 @@ export class ServiceStructure extends WorldObject {
   private sourceIconMesh: THREE.Mesh | null = null;
   private sourceTextMesh: THREE.Mesh | null = null;
   private statusMesh: THREE.Mesh | null = null;
+  private isOscillatingOpacity: boolean = false;
+  private oscillatingOpacityDirection: boolean = true;
+  private oscillatingOpacityState: number = 0.25;
+  private isSleepAnimating: boolean = false;
+  private sleepingZs: THREE.Mesh[] = [];
+  private nextZSpawnTime: number = 0;
+  private readonly OSCILLATING_OPACITY_SPEED = 0.5;
+  private readonly OSCILLATING_OPACITY_MIN = 0.25;
+  private readonly OSCILLATING_OPACITY_MAX = 0.9;
+  private readonly Z_SPAWN_INTERVAL = 1.5; // Spawn a new Z every 2 seconds
+  private readonly Z_FLOAT_SPEED = 0.5; // Units per second
+  private readonly Z_GROW_SPEED = 0.5; // Scale increase per second
+  private readonly Z_MAX_SCALE = 3; // Maximum scale before Z disappears
+  private readonly Z_START_SCALE = 0; // Initial scale of Z
+  private readonly Z_COLOR = STATUS_SLEEPING_HEX; // Use the sleeping status color
 
   constructor(options: ServiceStructureConstructorOptions) {
     super(options);
@@ -109,6 +149,8 @@ export class ServiceStructure extends WorldObject {
     // add deployment info at the top of the front face of the serviceStructure
     this.addDeploymentInfo(this.deployment);
 
+    this.addSvcLabel();
+
     // Position the entire group
     this.group.position.set(this.position.x, 0, this.position.z);
 
@@ -116,6 +158,47 @@ export class ServiceStructure extends WorldObject {
       'latestDeployments',
       this.handleLatestDeploymentsUpdate
     );
+  }
+
+  private addSvcLabel(): void {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const context = canvas.getContext('2d')!;
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    const label =
+      SERVICE_TYPE_LABELS[this.service.name.toLowerCase()] ||
+      SERVICE_TYPE_LABELS.default;
+
+    context.fillStyle = LIGHT_STEEL_BLUE_HEX;
+    context.font = 'bold 128px monospace';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    context.strokeStyle = VOLUME_BLACK_HEX;
+    context.lineWidth = 6;
+    context.strokeText(label, canvas.width / 2, canvas.height / 2);
+
+    context.fillText(label, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+    });
+
+    const geometry = new THREE.PlaneGeometry(this.width, this.height);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(0, this.height + 0.01, 0);
+    this.group.add(mesh);
   }
 
   private handleLatestDeploymentsUpdate = (
@@ -128,34 +211,16 @@ export class ServiceStructure extends WorldObject {
     });
   };
 
-  private setGroupOpacity(opacity: number): void {
-    this.group.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        if (object.material instanceof THREE.Material) {
-          // object.material.transparent = opacity < 1;
-          object.material.opacity = opacity;
-          object.material.needsUpdate = true;
-        } else if (Array.isArray(object.material)) {
-          object.material.forEach((material) => {
-            // material.transparent = opacity < 1;
-            material.opacity = opacity;
-            material.needsUpdate = true;
-          });
-        }
-      }
-    });
-  }
-
   private addDeploymentInfo(deployment: Deployment): void {
-    const deploymentInfo = deployment.status;
+    const deploymentStatus = deployment.status;
 
     // Create a canvas for the status text
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d')!;
 
     // Set canvas dimensions
-    const canvasWidth = 256;
-    const canvasHeight = 64;
+    const canvasWidth = 512;
+    const canvasHeight = 128;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
 
@@ -163,15 +228,18 @@ export class ServiceStructure extends WorldObject {
     context.clearRect(0, 0, canvasWidth, canvasHeight);
 
     // Set text properties
-    const fontSize = 24;
+    const fontSize = 48;
     const fontFamily = 'monospace';
     context.font = `bold ${fontSize}px ${fontFamily}`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
 
+    const structureMaterial = this.serviceStructure
+      .material as THREE.MeshStandardMaterial;
+
     // Determine text color based on status
     let textColor;
-    switch (deploymentInfo) {
+    switch (deploymentStatus) {
       case 'SUCCESS':
         textColor = STATUS_SUCCESS_ALT_HEX; // Green
         break;
@@ -186,14 +254,42 @@ export class ServiceStructure extends WorldObject {
         textColor = STATUS_DEFAULT_HEX; // Blue
     }
 
+    if (deploymentStatus === 'FAILED' || deploymentStatus === 'CRASHED') {
+      structureMaterial.opacity = 0.25;
+      structureMaterial.transparent = true;
+    } else if (deploymentStatus === 'SLEEPING') {
+      this.isSleepAnimating = true;
+    } else if (
+      deploymentStatus === 'BUILDING' ||
+      deploymentStatus === 'INITIALIZING' ||
+      deploymentStatus === 'DEPLOYING' ||
+      deploymentStatus === 'WAITING'
+    ) {
+      this.isOscillatingOpacity = true;
+      structureMaterial.transparent = true;
+    } else {
+      this.isOscillatingOpacity = false;
+      this.isSleepAnimating = false;
+      structureMaterial.opacity = 1;
+      structureMaterial.transparent = false;
+    }
+
     // Add black outline
     context.strokeStyle = VOLUME_BLACK_HEX;
     context.lineWidth = 3;
-    context.strokeText(deploymentInfo, canvasWidth / 2, canvasHeight / 2);
+    context.strokeText(
+      `${DEPLOYMENT_STATUS_EMOJI[deploymentStatus]} ${deploymentStatus}`,
+      canvasWidth / 2,
+      canvasHeight / 2
+    );
 
     // Draw the text with the appropriate color
     context.fillStyle = textColor;
-    context.fillText(deploymentInfo, canvasWidth / 2, canvasHeight / 2);
+    context.fillText(
+      `${DEPLOYMENT_STATUS_EMOJI[deploymentStatus]} ${deploymentStatus}`,
+      canvasWidth / 2,
+      canvasHeight / 2
+    );
 
     // Create texture from canvas
     const texture = new THREE.Texture(canvas);
@@ -222,13 +318,6 @@ export class ServiceStructure extends WorldObject {
 
     // Add to the group
     this.group.add(this.statusMesh);
-
-    // Set opacity based on status
-    if (deploymentInfo === 'FAILED' || deploymentInfo === 'CRASHED') {
-      this.setGroupOpacity(0.5);
-    } else {
-      this.setGroupOpacity(1);
-    }
   }
 
   public updateDeployment(deployment: Deployment) {
@@ -269,14 +358,6 @@ export class ServiceStructure extends WorldObject {
 
         // Add to group
         this.group.add(this.iconMesh);
-
-        // Apply current opacity state to new icon
-        if (
-          this.deployment.status === 'FAILED' ||
-          this.deployment.status === 'CRASHED'
-        ) {
-          this.setGroupOpacity(0.5);
-        }
       },
       undefined,
       (error) => {
@@ -305,6 +386,62 @@ export class ServiceStructure extends WorldObject {
 
     // Add to group
     this.group.add(this.iconMesh);
+  }
+
+  private createZMesh(): THREE.Mesh {
+    // Create a canvas for the Z texture
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+
+    // Set canvas dimensions
+    const canvasWidth = 128;
+    const canvasHeight = 128;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    // Clear the canvas
+    context.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Set text properties
+    const fontSize = 80;
+    const fontFamily = 'monospace';
+    context.font = `bold ${fontSize}px ${fontFamily}`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    // Add black outline
+    context.strokeStyle = UI_WHITE_HEX;
+    context.lineWidth = 2;
+    context.strokeText('Z', canvasWidth / 2, canvasHeight / 2);
+
+    // Draw the Z with the sleeping color
+    context.fillStyle = this.Z_COLOR;
+    context.fillText('Z', canvasWidth / 2, canvasHeight / 2);
+
+    // Create texture from canvas
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+
+    // Create material with the texture
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false, // Ensure proper transparency rendering
+    });
+
+    // Create a plane for the Z
+    const zSize = 0.5;
+    const geometry = new THREE.PlaneGeometry(zSize, zSize);
+    const mesh = new THREE.Mesh(geometry, material);
+
+    mesh.position.set(this.width / 2 - 0.5, this.height, this.depth / 2 - 0.5);
+    mesh.scale.set(this.Z_START_SCALE, this.Z_START_SCALE, this.Z_START_SCALE);
+
+    return mesh;
   }
 
   private addSourceInfo(source: Service['source']): void {
@@ -464,5 +601,69 @@ export class ServiceStructure extends WorldObject {
     );
   }
 
-  onUpdate(delta: number): void {}
+  private updateOscillatingOpacity(delta: number): void {
+    const structureMaterial = this.serviceStructure
+      .material as THREE.MeshStandardMaterial;
+
+    this.oscillatingOpacityState =
+      this.oscillatingOpacityState +
+      delta *
+        this.OSCILLATING_OPACITY_SPEED *
+        (this.oscillatingOpacityDirection ? 1 : -1);
+
+    if (this.oscillatingOpacityState > this.OSCILLATING_OPACITY_MAX) {
+      this.oscillatingOpacityDirection = false;
+    } else if (this.oscillatingOpacityState < this.OSCILLATING_OPACITY_MIN) {
+      this.oscillatingOpacityDirection = true;
+    }
+
+    structureMaterial.opacity = this.oscillatingOpacityState;
+  }
+
+  private updateSleepAnimation(delta: number): void {
+    // Check if it's time to spawn a new Z
+    if (Date.now() > this.nextZSpawnTime) {
+      // Create and add a new Z mesh
+      const zMesh = this.createZMesh();
+      this.sleepingZs.push(zMesh);
+      this.group.add(zMesh);
+
+      // Set next spawn time
+      this.nextZSpawnTime = Date.now() + this.Z_SPAWN_INTERVAL * 1000;
+    }
+
+    // Update each Z particle
+    for (let i = this.sleepingZs.length - 1; i >= 0; i--) {
+      const z = this.sleepingZs[i];
+
+      // Move upward
+      z.position.y += this.Z_FLOAT_SPEED * delta;
+
+      // Grow in size
+      const newScale = z.scale.x + this.Z_GROW_SPEED * delta;
+      z.scale.set(newScale, newScale, newScale);
+
+      // Fade out as it grows
+      const material = z.material as THREE.MeshBasicMaterial;
+      material.opacity =
+        1 -
+        (newScale - this.Z_START_SCALE) /
+          (this.Z_MAX_SCALE - this.Z_START_SCALE);
+
+      // Remove if it's grown too large
+      if (newScale >= this.Z_MAX_SCALE) {
+        this.group.remove(z);
+        this.sleepingZs.splice(i, 1);
+      }
+    }
+  }
+
+  onUpdate(delta: number): void {
+    if (this.isOscillatingOpacity) {
+      this.updateOscillatingOpacity(delta);
+    }
+    if (this.isSleepAnimating) {
+      this.updateSleepAnimation(delta);
+    }
+  }
 }

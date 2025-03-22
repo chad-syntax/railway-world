@@ -5,20 +5,13 @@ import {
   processRailwayData,
 } from '../graphql/railway-data-query';
 import { RailwayData } from '../../types';
-
-interface RailwayDataQueryParams {
-  railwayToken?: string;
-  railwayProjectId?: string;
-  [key: string]: string | undefined;
-}
+import { mockRailwayData } from '../../mock-data';
 
 export async function handleRailwayData(
   req: FastifyRequest,
   reply: FastifyReply
 ) {
   try {
-    // Extract railway token and project ID from query parameters
-    const query = req.query as RailwayDataQueryParams;
     const railwayToken = process.env.RAILWAY_WORLD_TOKEN;
     const railwayProjectId = process.env.RAILWAY_WORLD_PROJECT_ID;
 
@@ -32,19 +25,23 @@ export async function handleRailwayData(
     }
 
     try {
-      // Fetch data with the new query
-      const response = await gqlRequest(
-        railwayDataQuery,
-        {
-          id: railwayProjectId,
-        },
-        {
-          Authorization: `Bearer ${railwayToken}`,
-        }
-      );
+      if (process.env.MOCK_DATA !== 'true') {
+        // Fetch data with the new query
+        const response = await gqlRequest(
+          railwayDataQuery,
+          {
+            id: railwayProjectId,
+          },
+          {
+            Authorization: `Bearer ${railwayToken}`,
+          }
+        );
+        // Process the data into our client-friendly format
+        const processedData: RailwayData = processRailwayData(response);
+        return reply.send({ data: processedData });
+      }
 
-      // Process the data into our client-friendly format
-      const processedData: RailwayData = processRailwayData(response);
+      const processedData: RailwayData = processRailwayData(mockRailwayData);
 
       // Return the processed data
       return reply.send({ data: processedData });

@@ -1,5 +1,5 @@
 import { gqlRequest } from './request';
-
+import { DeploymentStatus } from '../../types';
 const latestDeploymentsQuery = `
 query LatestDeployments($id: String!) {
   project(id: $id) {
@@ -52,7 +52,7 @@ export type LatestDeploymentsResponse = {
                 };
                 latestDeployment: {
                   id: string;
-                  status: string;
+                  status: DeploymentStatus;
                   updatedAt: string;
                 };
               };

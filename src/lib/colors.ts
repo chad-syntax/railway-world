@@ -32,6 +32,9 @@ export const SERVICE_POSTIZ_HEX = '#612ad5';
 export const SERVICE_DEFAULT = 0x808080;
 export const SERVICE_DEFAULT_HEX = '#808080';
 
+export const LIGHT_STEEL_BLUE = 0xb0c4de;
+export const LIGHT_STEEL_BLUE_HEX = '#b0c4de';
+
 // Status colors
 export const STATUS_SUCCESS = 0x4caf50;
 export const STATUS_SUCCESS_HEX = '#4caf50';
@@ -45,8 +48,8 @@ export const STATUS_ERROR_LIGHT = 0xff6b6b;
 export const STATUS_ERROR_LIGHT_HEX = '#ff6b6b';
 export const STATUS_NEUTRAL = 0x808080;
 export const STATUS_NEUTRAL_HEX = '#808080';
-export const STATUS_SLEEPING = 0x808080;
-export const STATUS_SLEEPING_HEX = '#808080';
+export const STATUS_SLEEPING = 0x4169e1;
+export const STATUS_SLEEPING_HEX = '#4169e1';
 export const STATUS_FAILED = 0xff0000;
 export const STATUS_FAILED_HEX = '#ff0000';
 export const STATUS_DEFAULT = 0xc3c3c3;
