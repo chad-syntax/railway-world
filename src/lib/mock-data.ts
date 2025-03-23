@@ -531,7 +531,7 @@ export const mockLatestDeployments: LatestDeploymentsResponse = {
                     },
                     latestDeployment: {
                       id: '3a59d66d-6d41-49f4-a029-8c22d1e011ca',
-                      status: 'SUCCESS',
+                      status: 'FAILED',
                       updatedAt: '2025-03-19T18:23:02.133Z',
                     },
                   },

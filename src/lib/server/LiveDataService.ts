@@ -16,14 +16,19 @@ import {
   requestLatestDeployments,
 } from './graphql/latest-deployments-query';
 import { config } from 'dotenv';
-import { mockLatestDeployments } from '../mock-data';
+import { mockLatestDeployments, mockRailwayData } from '../mock-data';
 
 config();
 
 const railwayToken = process.env.RAILWAY_WORLD_TOKEN!;
 const railwayProjectId = process.env.RAILWAY_WORLD_PROJECT_ID!;
+const isMockDataMode = process.env.MOCK_DATA === 'true';
 
 const getRailwayData = async (): Promise<RailwayData> => {
+  if (isMockDataMode) {
+    return processRailwayData(mockRailwayData);
+  }
+
   if (!railwayToken || !railwayProjectId) {
     console.error(
       'Missing required environment variables, cannot fetch railway data'
@@ -58,7 +63,7 @@ export class LiveDataService {
   private latestDeploymentsInterval: NodeJS.Timeout | null = null;
   private gqlDeploymentSubscriptions: Set<string> = new Set();
   private attempts: number = 0;
-  private latestDeploymentsIntervalMs: number = 20 * 1000; // every 20 seconds, more will surpass rate limit
+  private latestDeploymentsIntervalMs: number = 5 * 1000; // every 5 seconds, more will surpass rate limit
 
   constructor() {
     this.railwayDataPromise = getRailwayData().then((data) => {
@@ -294,6 +299,11 @@ export class LiveDataService {
   }
 
   private startPollingForLatestDeployments() {
+    if (this.latestDeploymentsInterval) {
+      clearInterval(this.latestDeploymentsInterval);
+      this.latestDeploymentsInterval = null;
+    }
+
     this.latestDeploymentsInterval = setInterval(async () => {
       let latestDeploymentsData: LatestDeploymentsResponse;
 

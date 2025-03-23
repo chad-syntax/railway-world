@@ -94,6 +94,16 @@ export class ServiceStructure extends WorldObject {
   private readonly Z_MAX_SCALE = 3; // Maximum scale before Z disappears
   private readonly Z_START_SCALE = 0; // Initial scale of Z
   private readonly Z_COLOR = STATUS_SLEEPING_HEX; // Use the sleeping status color
+  private isFireAnimating: boolean = false;
+  private fireMeshes: THREE.Mesh[] = [];
+  private fireTexture: THREE.Texture | null = null;
+  private currentFireFrame: number = 0;
+  private readonly FIRE_TEXTURE_SIZE = 1;
+  private readonly FIRE_FRAME_INTERVAL = 0.15; // 100ms between frames
+  private readonly TOTAL_FIRE_FRAMES = 32; // Total frames in spritesheet
+  private readonly FIRE_SPRITE_COLS = 8; // 8 columns
+  private readonly FIRE_SPRITE_ROWS = 4; // 4 rows
+  private fireAnimationTime: number = 0;
 
   constructor(options: ServiceStructureConstructorOptions) {
     super(options);
@@ -254,11 +264,18 @@ export class ServiceStructure extends WorldObject {
         textColor = STATUS_DEFAULT_HEX; // Blue
     }
 
+    // TODO clean this up
     if (deploymentStatus === 'FAILED' || deploymentStatus === 'CRASHED') {
-      structureMaterial.opacity = 0.25;
-      structureMaterial.transparent = true;
+      this.isFireAnimating = true;
+      this.isOscillatingOpacity = false;
+      this.isSleepAnimating = false;
+      structureMaterial.opacity = 1;
+      this.createFireMeshes();
     } else if (deploymentStatus === 'SLEEPING') {
       this.isSleepAnimating = true;
+      this.isOscillatingOpacity = false;
+      this.isFireAnimating = false;
+      structureMaterial.opacity = 1;
     } else if (
       deploymentStatus === 'BUILDING' ||
       deploymentStatus === 'INITIALIZING' ||
@@ -267,9 +284,13 @@ export class ServiceStructure extends WorldObject {
     ) {
       this.isOscillatingOpacity = true;
       structureMaterial.transparent = true;
+      this.isSleepAnimating = false;
+      this.isFireAnimating = false;
     } else {
       this.isOscillatingOpacity = false;
       this.isSleepAnimating = false;
+      this.isFireAnimating = false;
+      this.removeFireMeshes();
       structureMaterial.opacity = 1;
       structureMaterial.transparent = false;
     }
@@ -658,12 +679,143 @@ export class ServiceStructure extends WorldObject {
     }
   }
 
+  private createFireMeshes(): void {
+    // Remove any existing fire meshes
+    this.removeFireMeshes();
+
+    // Load the fire spritesheet texture
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load(
+      '/minecraft_fire_spritesheet.png',
+      (texture) => {
+        texture.minFilter = THREE.NearestFilter;
+        texture.magFilter = THREE.NearestFilter;
+        this.fireTexture = texture;
+
+        // Create fire planes for each side of the cube
+        const positions = [
+          // Front face fires
+          { x: -this.FIRE_TEXTURE_SIZE / 1.5, z: this.depth / 2 },
+          { x: this.FIRE_TEXTURE_SIZE / 1.5, z: this.depth / 2 },
+          // Back face fires
+          { x: -this.FIRE_TEXTURE_SIZE / 1.5, z: -this.depth / 2 },
+          { x: this.FIRE_TEXTURE_SIZE / 1.5, z: -this.depth / 2 },
+          // Right side fires
+          { x: this.width / 2, z: -this.FIRE_TEXTURE_SIZE / 1.5 },
+          { x: this.width / 2, z: this.FIRE_TEXTURE_SIZE / 1.5 },
+          // Left side fires
+          { x: -this.width / 2, z: -this.FIRE_TEXTURE_SIZE / 1.5 },
+          { x: -this.width / 2, z: this.FIRE_TEXTURE_SIZE / 1.5 },
+        ];
+
+        positions.forEach(({ x, z }) => {
+          const fireGeometry = new THREE.PlaneGeometry(
+            this.FIRE_TEXTURE_SIZE,
+            this.FIRE_TEXTURE_SIZE
+          );
+
+          // Update UV coordinates for the first frame
+          const frameWidth = 1 / this.FIRE_SPRITE_COLS;
+          const frameHeight = 1 / this.FIRE_SPRITE_ROWS;
+          const uvs = fireGeometry.attributes.uv;
+          const frameX = 0;
+          const frameY = 0; // Start from top row
+          for (let i = 0; i < uvs.count; i++) {
+            const u = uvs.getX(i);
+            const v = uvs.getY(i);
+            uvs.setXY(
+              i,
+              frameX * frameWidth + u * frameWidth,
+              frameY * frameHeight + v * frameHeight
+            );
+          }
+
+          const fireMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            alphaTest: 0.1,
+          });
+
+          const fireMesh = new THREE.Mesh(fireGeometry, fireMaterial);
+
+          // Position the fire slightly above the cube
+          fireMesh.position.set(x, this.height + this.FIRE_TEXTURE_SIZE / 2, z);
+
+          // Rotate the fire to face outward from the center
+          if (Math.abs(x) === this.width / 2) {
+            // Side fires
+            fireMesh.rotation.y = Math.PI / 2;
+          }
+
+          this.fireMeshes.push(fireMesh);
+          this.group.add(fireMesh);
+        });
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading fire spritesheet:', error);
+      }
+    );
+  }
+
+  private updateFireAnimation(delta: number): void {
+    if (!this.isFireAnimating || !this.fireTexture) return;
+
+    this.fireAnimationTime += delta;
+    if (this.fireAnimationTime >= this.FIRE_FRAME_INTERVAL) {
+      this.fireAnimationTime = 0;
+      this.currentFireFrame =
+        (this.currentFireFrame + 1) % this.TOTAL_FIRE_FRAMES;
+
+      // Calculate the frame position in the spritesheet grid
+      const frameX = this.currentFireFrame % this.FIRE_SPRITE_COLS;
+      const frameY = Math.floor(this.currentFireFrame / this.FIRE_SPRITE_COLS);
+      const frameWidth = 1 / this.FIRE_SPRITE_COLS;
+      const frameHeight = 1 / this.FIRE_SPRITE_ROWS;
+
+      // Update UV coordinates for all fire meshes
+      this.fireMeshes.forEach((mesh) => {
+        const uvs = mesh.geometry.attributes.uv;
+        for (let i = 0; i < uvs.count; i++) {
+          const u = i % 2 === 0 ? 0 : 1; // 0 for left edge, 1 for right edge
+          const v = i < 2 ? 1 : 0; // 1 for top edge, 0 for bottom edge
+          uvs.setXY(
+            i,
+            frameX * frameWidth + u * frameWidth,
+            frameY * frameHeight + v * frameHeight
+          );
+        }
+        uvs.needsUpdate = true;
+      });
+    }
+  }
+
+  private removeFireMeshes(): void {
+    this.fireMeshes.forEach((mesh) => {
+      this.group.remove(mesh);
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      material.map?.dispose();
+      material.dispose();
+      mesh.geometry.dispose();
+    });
+    this.fireMeshes = [];
+    this.fireTexture?.dispose();
+    this.fireTexture = null;
+    this.currentFireFrame = 0;
+    this.fireAnimationTime = 0;
+  }
+
   onUpdate(delta: number): void {
     if (this.isOscillatingOpacity) {
       this.updateOscillatingOpacity(delta);
     }
     if (this.isSleepAnimating) {
       this.updateSleepAnimation(delta);
+    }
+    if (this.isFireAnimating) {
+      this.updateFireAnimation(delta);
     }
   }
 }
