@@ -77,3 +77,6 @@ export function processSourceText(text: string): string {
 
   return processed;
 }
+
+export const wait = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));

@@ -99,7 +99,7 @@ export class ServiceStructure extends WorldObject {
   private fireTexture: THREE.Texture | null = null;
   private currentFireFrame: number = 0;
   private readonly FIRE_TEXTURE_SIZE = 1;
-  private readonly FIRE_FRAME_INTERVAL = 0.15; // 100ms between frames
+  private readonly FIRE_FRAME_INTERVAL = 0.15; // 150ms between frames
   private readonly TOTAL_FIRE_FRAMES = 32; // Total frames in spritesheet
   private readonly FIRE_SPRITE_COLS = 8; // 8 columns
   private readonly FIRE_SPRITE_ROWS = 4; // 4 rows

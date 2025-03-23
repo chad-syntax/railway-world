@@ -17,6 +17,7 @@ import {
 } from './graphql/latest-deployments-query';
 import { config } from 'dotenv';
 import { mockLatestDeployments, mockRailwayData } from '../mock-data';
+import { wait } from '../utils';
 
 config();
 
@@ -64,15 +65,27 @@ export class LiveDataService {
   private gqlDeploymentSubscriptions: Set<string> = new Set();
   private attempts: number = 0;
   private latestDeploymentsIntervalMs: number = 5 * 1000; // every 5 seconds, more will surpass rate limit
+  private railwayDataAttempts: number = 0;
 
   constructor() {
-    this.railwayDataPromise = getRailwayData().then((data) => {
-      this.httpDeploymentIds = data.services
-        .filter((service) => service.domains.length > 0)
-        .map((service) => service.latestDeployment.id);
-      return data;
-    });
+    this.railwayDataPromise = this.initializeRailwayData();
   }
+
+  private initializeRailwayData = async () => {
+    let data: RailwayData | null = null;
+
+    while (!data) {
+      try {
+        data = await getRailwayData();
+      } catch (error) {
+        console.error('Error initializing railway data:', error);
+        this.railwayDataAttempts++;
+        await wait(this.railwayDataAttempts ** 2 * 1000);
+      }
+    }
+
+    return data;
+  };
 
   private handleClientMessage(
     socket: WebSocket.WebSocket,
