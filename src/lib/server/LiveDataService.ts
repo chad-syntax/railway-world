@@ -312,10 +312,7 @@ export class LiveDataService {
   }
 
   private startPollingForLatestDeployments() {
-    if (this.latestDeploymentsInterval) {
-      clearInterval(this.latestDeploymentsInterval);
-      this.latestDeploymentsInterval = null;
-    }
+    if (this.latestDeploymentsInterval) return;
 
     this.latestDeploymentsInterval = setInterval(async () => {
       let latestDeploymentsData: LatestDeploymentsResponse;

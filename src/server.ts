@@ -37,7 +37,7 @@ const setupServer = async () => {
 
   // In production, serve the static Vite-built files
   if (process.env.NODE_ENV === 'production') {
-    const distPath = path.join(__dirname, 'dist');
+    const distPath = path.join(__dirname, '..', 'dist');
 
     // Register static file serving with custom handling for SPA routes
     await server.register(fastifyStatic, {
