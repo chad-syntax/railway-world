@@ -45,7 +45,6 @@ export class VolumeStructure extends WorldObject {
 
     this.createVolume();
     this.addVolumeIcon();
-    this.createVolumeName();
     this.createLabel(
       this.volume.name,
       {
@@ -91,38 +90,19 @@ export class VolumeStructure extends WorldObject {
       emissive: new THREE.Color(this.color).multiplyScalar(0.2),
     });
 
-    const usageTextCanvas = document.createElement('canvas');
-    const usageTextContext = usageTextCanvas.getContext('2d')!;
-    usageTextCanvas.width = 1024;
-    usageTextCanvas.height = 1024;
-
-    usageTextContext.clearRect(
-      0,
-      0,
-      usageTextCanvas.width,
-      usageTextCanvas.height
+    const { texture } = this.createTextTexture(
+      `${Math.round(this.volume.currentSizeMB)} / ${this.volume.sizeMB}mb`,
+      {
+        fontSize: 128,
+        fontWeight: 'lighter',
+        canvasWidth: 1024,
+        canvasHeight: 1024,
+        strokeWidth: 6,
+      }
     );
-    usageTextContext.font = 'bold 128px Arial';
-    usageTextContext.fillStyle = UI_WHITE_HEX;
-    usageTextContext.textAlign = 'center';
-    usageTextContext.textBaseline = 'middle';
-
-    const usageText = `${Math.round(this.volume.currentSizeMB)} / ${
-      this.volume.sizeMB
-    }mb`;
-    usageTextContext.fillText(
-      usageText,
-      usageTextCanvas.width / 2,
-      usageTextCanvas.height / 2
-    );
-
-    const usageTextTexture = new THREE.Texture(usageTextCanvas);
-    usageTextTexture.needsUpdate = true;
-    usageTextTexture.minFilter = THREE.LinearFilter;
-    usageTextTexture.magFilter = THREE.LinearFilter;
 
     const usageTextMaterial = new THREE.MeshBasicMaterial({
-      map: usageTextTexture,
+      map: texture,
       transparent: true,
       side: THREE.DoubleSide,
     });
@@ -192,32 +172,6 @@ export class VolumeStructure extends WorldObject {
 
     // Load the SVG
     img.src = '/volume.svg';
-  }
-
-  private createVolumeName(): void {
-    const canvas = document.createElement('canvas');
-
-    const texture = new THREE.Texture(canvas);
-    texture.needsUpdate = true;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
-
-    const textWidth = this.width * 0.8;
-    const textHeight = this.height * 0.2;
-    const textGeometry = new THREE.PlaneGeometry(textWidth, textHeight);
-    const textMesh = new THREE.Mesh(textGeometry, material);
-
-    // Position text on right side near top
-    textMesh.position.set(this.width / 2 + 0.01, this.height * 0.8, 0);
-    textMesh.rotation.y = Math.PI / 2; // Rotate to face right
-
-    this.group.add(textMesh);
   }
 
   onUpdate(delta: number): void {}

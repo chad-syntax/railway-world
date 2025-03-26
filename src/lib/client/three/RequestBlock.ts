@@ -4,8 +4,9 @@ import {
   Mesh,
   CanvasTexture,
   MeshStandardMaterial,
-  DoubleSide,
   LinearFilter,
+  MeshBasicMaterial,
+  PlaneGeometry,
 } from 'three';
 import { Position, WorldObject } from './WorldObject';
 import { World } from './World';
@@ -16,6 +17,11 @@ import {
   STATUS_ERROR,
   STATUS_NEUTRAL,
   UI_WHITE_HEX,
+  STATUS_SUCCESS_HEX,
+  STATUS_WARNING_HEX,
+  STATUS_ERROR_HEX,
+  STATUS_ERROR_LIGHT_HEX,
+  STATUS_NEUTRAL_HEX,
 } from '../../../lib/colors';
 
 type RequestBlockOptions = {
@@ -132,7 +138,7 @@ export class RequestBlock extends WorldObject {
     }
   }
 
-  private createTextTexture(
+  private createTextTexture2(
     text: string,
     size: number = 128,
     baseColor: number
@@ -194,55 +200,87 @@ export class RequestBlock extends WorldObject {
     // Choose color based on HTTP status code
     const status = this.log.httpStatus;
     let baseColor;
+    let baseColorHex;
 
     if (status >= 200 && status < 300) {
       baseColor = STATUS_SUCCESS; // Green for 2xx (success)
+      baseColorHex = STATUS_SUCCESS_HEX;
     } else if (status >= 300 && status < 400) {
       baseColor = STATUS_WARNING; // Orange for 3xx (redirection)
+      baseColorHex = STATUS_WARNING_HEX;
     } else if (status >= 400 && status < 500) {
       baseColor = STATUS_ERROR_LIGHT; // Light red for 4xx (client errors)
+      baseColorHex = STATUS_ERROR_LIGHT_HEX;
     } else if (status >= 500) {
       baseColor = STATUS_ERROR; // Dark red for 5xx (server errors)
+      baseColorHex = STATUS_ERROR_HEX;
     } else {
       baseColor = STATUS_NEUTRAL; // Gray for unknown status codes
+      baseColorHex = STATUS_NEUTRAL_HEX;
     }
 
-    // Create text texture
-    const typeTexture = this.createTextTexture(requestType, 128, baseColor);
-    const methodTexture = this.createTextTexture(
-      this.log.method,
-      128,
-      baseColor
-    );
+    // Create the main cube with solid color
+    const material = new MeshStandardMaterial({
+      color: baseColor,
+      emissive: baseColor,
+      emissiveIntensity: 0.5,
+    });
 
-    // Create materials for each face
-    const materials = [
-      new MeshStandardMaterial({
-        map: typeTexture,
-        transparent: true,
-        side: DoubleSide,
-      }), // right
-      new MeshStandardMaterial({
-        map: typeTexture,
-        transparent: true,
-        side: DoubleSide,
-      }), // left
-      new MeshStandardMaterial({ color: baseColor }), // top
-      new MeshStandardMaterial({ color: baseColor }), // bottom
-      new MeshStandardMaterial({
-        map: methodTexture,
-        transparent: true,
-        side: DoubleSide,
-      }), // front
-      new MeshStandardMaterial({
-        map: methodTexture,
-        transparent: true,
-        side: DoubleSide,
-      }), // back
-    ];
-
-    this.cube = new Mesh(geometry, materials);
+    this.cube = new Mesh(geometry, material);
     this.group.add(this.cube);
+
+    // Create text textures for request type and method
+    const { texture: typeTexture } = this.createTextTexture(requestType, {
+      fontSize: 94,
+      canvasWidth: 256,
+      canvasHeight: 256,
+      strokeWidth: 6,
+    });
+
+    const { texture: methodTexture } = this.createTextTexture(this.log.method, {
+      fontSize: 94,
+      canvasWidth: 256,
+      canvasHeight: 256,
+      strokeWidth: 6,
+    });
+
+    // Create materials for the text planes
+    const textMaterial = new MeshBasicMaterial({
+      map: typeTexture,
+      transparent: true,
+    });
+
+    const methodMaterial = new MeshBasicMaterial({
+      map: methodTexture,
+      transparent: true,
+    });
+
+    // Create planes for the text
+    const textSize = this.cubeSize * 0.8; // Slightly smaller than cube size
+    const textGeometry = new PlaneGeometry(textSize, textSize);
+
+    // Create and position the text meshes for method (front and back)
+    const methodFrontMesh = new Mesh(textGeometry, methodMaterial);
+    const methodBackMesh = new Mesh(textGeometry, methodMaterial);
+
+    // Position method text on front and back faces
+    methodFrontMesh.position.set(0, 0, this.cubeSize / 2 + 0.02);
+    methodBackMesh.position.set(0, 0, -this.cubeSize / 2 - 0.02);
+    methodBackMesh.rotation.y = Math.PI; // Rotate to face outward
+    this.group.add(methodFrontMesh);
+    this.group.add(methodBackMesh);
+
+    // Create and position the text meshes for type (left and right)
+    const typeLeftMesh = new Mesh(textGeometry, textMaterial);
+    const typeRightMesh = new Mesh(textGeometry, textMaterial);
+
+    // Position type text on left and right faces
+    typeLeftMesh.position.set(-this.cubeSize / 2 - 0.02, 0, 0);
+    typeLeftMesh.rotation.y = -Math.PI / 2; // Rotate to face left
+    typeRightMesh.position.set(this.cubeSize / 2 + 0.02, 0, 0);
+    typeRightMesh.rotation.y = Math.PI / 2; // Rotate to face right
+    this.group.add(typeLeftMesh);
+    this.group.add(typeRightMesh);
   }
 
   onUpdate(delta: number) {

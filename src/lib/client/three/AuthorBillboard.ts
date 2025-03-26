@@ -58,7 +58,7 @@ export class AuthorBillboard extends Billboard {
 
     // Draw social links
     ctx.font = '72px monospace';
-    ctx.fillText('X - @SyntaxChad', canvas.width / 2, canvas.height * 0.8);
+    ctx.fillText('X - @chad_syntax', canvas.width / 2, canvas.height * 0.8);
     ctx.font = '44px monospace';
     ctx.fillText(
       'github.com/chad-syntax/railway-world',

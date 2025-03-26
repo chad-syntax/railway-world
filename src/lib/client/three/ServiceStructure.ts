@@ -171,33 +171,16 @@ export class ServiceStructure extends WorldObject {
   }
 
   private addSvcLabel(): void {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const context = canvas.getContext('2d')!;
-
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
     const label =
       SERVICE_TYPE_LABELS[this.service.name.toLowerCase()] ||
       SERVICE_TYPE_LABELS.default;
 
-    context.fillStyle = LIGHT_STEEL_BLUE_HEX;
-    context.font = 'bold 128px monospace';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    context.strokeStyle = VOLUME_BLACK_HEX;
-    context.lineWidth = 6;
-    context.strokeText(label, canvas.width / 2, canvas.height / 2);
-
-    context.fillText(label, canvas.width / 2, canvas.height / 2);
-
-    const texture = new THREE.Texture(canvas);
-    texture.needsUpdate = true;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = false;
+    const { texture } = this.createTextTexture(label, {
+      fontSize: 128,
+      canvasWidth: 512,
+      canvasHeight: 512,
+      strokeWidth: 6,
+    });
 
     const material = new THREE.MeshBasicMaterial({
       map: texture,
@@ -223,26 +206,6 @@ export class ServiceStructure extends WorldObject {
 
   private addDeploymentInfo(deployment: Deployment): void {
     const deploymentStatus = deployment.status;
-
-    // Create a canvas for the status text
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-
-    // Set canvas dimensions
-    const canvasWidth = 512;
-    const canvasHeight = 128;
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
-    // Clear the canvas
-    context.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // Set text properties
-    const fontSize = 48;
-    const fontFamily = 'monospace';
-    context.font = `bold ${fontSize}px ${fontFamily}`;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
 
     const structureMaterial = this.serviceStructure
       .material as THREE.MeshStandardMaterial;
@@ -295,29 +258,15 @@ export class ServiceStructure extends WorldObject {
       structureMaterial.transparent = false;
     }
 
-    // Add black outline
-    context.strokeStyle = VOLUME_BLACK_HEX;
-    context.lineWidth = 3;
-    context.strokeText(
+    const { texture } = this.createTextTexture(
       `${DEPLOYMENT_STATUS_EMOJI[deploymentStatus]} ${deploymentStatus}`,
-      canvasWidth / 2,
-      canvasHeight / 2
+      {
+        fontSize: 96,
+        canvasWidth: 1024,
+        canvasHeight: 256,
+        strokeWidth: 12,
+      }
     );
-
-    // Draw the text with the appropriate color
-    context.fillStyle = textColor;
-    context.fillText(
-      `${DEPLOYMENT_STATUS_EMOJI[deploymentStatus]} ${deploymentStatus}`,
-      canvasWidth / 2,
-      canvasHeight / 2
-    );
-
-    // Create texture from canvas
-    const texture = new THREE.Texture(canvas);
-    texture.needsUpdate = true;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = false;
 
     // Create material with the texture
     const material = new THREE.MeshBasicMaterial({
@@ -410,41 +359,14 @@ export class ServiceStructure extends WorldObject {
   }
 
   private createZMesh(): THREE.Mesh {
-    // Create a canvas for the Z texture
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-
-    // Set canvas dimensions
-    const canvasWidth = 128;
-    const canvasHeight = 128;
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
-    // Clear the canvas
-    context.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // Set text properties
-    const fontSize = 80;
-    const fontFamily = 'monospace';
-    context.font = `bold ${fontSize}px ${fontFamily}`;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    // Add black outline
-    context.strokeStyle = UI_WHITE_HEX;
-    context.lineWidth = 2;
-    context.strokeText('Z', canvasWidth / 2, canvasHeight / 2);
-
-    // Draw the Z with the sleeping color
-    context.fillStyle = this.Z_COLOR;
-    context.fillText('Z', canvasWidth / 2, canvasHeight / 2);
-
-    // Create texture from canvas
-    const texture = new THREE.Texture(canvas);
-    texture.needsUpdate = true;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = false;
+    const { texture } = this.createTextTexture('Z', {
+      fontSize: 80,
+      canvasWidth: 128,
+      canvasHeight: 128,
+      color: this.Z_COLOR,
+      strokeColor: UI_WHITE_HEX,
+      strokeWidth: 4,
+    });
 
     // Create material with the texture
     const material = new THREE.MeshBasicMaterial({
@@ -490,67 +412,15 @@ export class ServiceStructure extends WorldObject {
   }
 
   private createSourceTextTexture(text: string): void {
-    // Create a canvas for the text texture
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-
-    // Set canvas dimensions - make it narrow and appropriate for side text
-    const canvasWidth = 512;
-    let canvasHeight = 128;
-
-    // Break the text into lines using our utility function
     const maxCharsPerLine = 20;
     const lines = breakTextIntoLines(text, maxCharsPerLine);
 
-    // Adjust canvas height for multiple lines
-    if (lines.length > 1) {
-      canvasHeight = 128 * lines.length;
-    }
-
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
-    // Clear the canvas with a transparent background
-    context.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // Set text properties
-    const fontSize = 24;
-    const fontFamily = 'monospace';
-    context.font = `${fontSize}px ${fontFamily}`;
-
-    // Add a subtle drop shadow
-    context.shadowColor = 'rgba(0, 0, 0, 0.6)';
-    context.shadowBlur = 3;
-    context.shadowOffsetX = 1;
-    context.shadowOffsetY = 1;
-
-    // Pre-flip the canvas horizontally to counteract the rotation effect
-    context.save();
-    context.scale(-1, 1);
-    context.translate(-canvasWidth, 0);
-
-    // Draw each line of text
-    context.fillStyle = this.nameColor;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    const lineHeight = fontSize * 1.2; // Space between lines
-    const startY = (canvasHeight - (lines.length - 1) * lineHeight) / 2;
-
-    lines.forEach((line, index) => {
-      const yPos = startY + index * lineHeight;
-      context.fillText(line, canvasWidth / 2, yPos);
+    const { texture } = this.createTextTexture(lines, {
+      fontSize: 48,
+      canvasWidth: 1024,
+      canvasHeight: 256,
+      strokeWidth: 0,
     });
-
-    // Restore the canvas context
-    context.restore();
-
-    // Create a texture from the canvas
-    const texture = new THREE.Texture(canvas);
-    texture.needsUpdate = true;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = false;
 
     // Create a material with the texture
     const material = new THREE.MeshBasicMaterial({
@@ -574,7 +444,7 @@ export class ServiceStructure extends WorldObject {
     this.sourceTextMesh.position.set(this.width / 2 + 0.01, textY, 0);
 
     // Rotate to face right
-    this.sourceTextMesh.rotation.y = -Math.PI / 2;
+    this.sourceTextMesh.rotation.y = Math.PI / 2;
 
     // Add to the group
     this.group.add(this.sourceTextMesh);

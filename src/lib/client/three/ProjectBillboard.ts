@@ -134,7 +134,7 @@ export class ProjectBillboard extends Billboard {
       ctx.restore();
 
       // draw updated at
-      const updatedAtText = `Last Updated: ${new Date(
+      const updatedAtText = `Project Last Updated: ${new Date(
         this.updatedAt
       ).toLocaleDateString('en-US', {
         weekday: 'short',

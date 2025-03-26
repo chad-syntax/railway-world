@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ServiceStructure } from './ServiceStructure';
 import { World } from './World';
 import { WorldObject, Position } from './WorldObject';
-import { CONNECTION_BLUE, UI_WHITE } from '../../../lib/colors';
+import { CONNECTION_BLUE, UI_WHITE, COLOR_BLUE_HEX } from '../../../lib/colors';
 
 type InternetGlobeConstructorOptions = {
   name: string;
@@ -90,37 +90,13 @@ export class InternetGlobe extends WorldObject {
     const displayText = this.domains.join(' | ');
     if (!displayText) return;
 
-    // Create a canvas texture for the text
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-
-    // Size the canvas appropriately
-    canvas.width = 4096;
-    canvas.height = 256;
-
-    // Clear the canvas
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#00008B';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Set up text style
-    context.font = '96px monospace';
-    context.fillStyle = '#ffffff';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    // Add a subtle shadow for better visibility
-    context.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    context.shadowBlur = 4;
-    context.shadowOffsetX = 2;
-    context.shadowOffsetY = 2;
-
-    // Draw the text
-    context.fillText(displayText, canvas.width / 2, canvas.height / 2);
-
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
+    const { texture } = this.createTextTexture(displayText, {
+      fontSize: 48,
+      canvasWidth: 2048,
+      canvasHeight: 128,
+      strokeWidth: 0,
+      backgroundColor: COLOR_BLUE_HEX,
+    });
 
     // Create material with the texture
     const material = new THREE.MeshBasicMaterial({

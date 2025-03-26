@@ -66,3 +66,7 @@ export const VOLUME_GREEN = 0x00ff00;
 export const VOLUME_GREEN_HEX = '#00ff00';
 export const VOLUME_BLACK = 0x000000;
 export const VOLUME_BLACK_HEX = '#000000';
+
+// Colors
+export const COLOR_BLUE = 0x00008b;
+export const COLOR_BLUE_HEX = '#00008b';

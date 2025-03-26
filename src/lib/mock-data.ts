@@ -429,7 +429,7 @@ export const mockRailwayData = {
                       id: 'a66e029b-5172-4b22-a531-092c1e1828cb',
                       type: 'CLOUD',
                       mountPath: '/var/lib/postgresql/data',
-                      currentSizeMB: 0,
+                      currentSizeMB: 200.019968,
                       sizeMB: 5000,
                       service: {
                         id: '15491bd6-9e85-41f9-af8f-bc87f858fe21',
@@ -445,7 +445,7 @@ export const mockRailwayData = {
                       id: 'a94d9684-4eeb-4385-aeaa-404175af76ef',
                       type: 'CLOUD',
                       mountPath: '/bitnami',
-                      currentSizeMB: 0,
+                      currentSizeMB: 149.516288,
                       sizeMB: 5000,
                       service: {
                         id: '7813e25d-ac72-4f87-b4a5-bb16b5390c21',
@@ -461,7 +461,7 @@ export const mockRailwayData = {
                       id: 'd1c5b9b4-50c9-4424-aa76-0f63814ff3c7',
                       type: 'CLOUD',
                       mountPath: '/uploads',
-                      currentSizeMB: 0,
+                      currentSizeMB: 328.94975999999997,
                       sizeMB: 5000,
                       service: {
                         id: '67bf96f4-4575-4da8-a373-131996d24fc2',

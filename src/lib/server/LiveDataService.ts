@@ -292,7 +292,7 @@ export class LiveDataService {
   };
 
   private startGqlSubscriptionForLogs() {
-    if (this.gqlWs) return;
+    if (this.gqlWs || isMockDataMode) return;
 
     this.gqlWs = new WebSocket(GRAPHQL_WS_API_URL, ['graphql-transport-ws'], {
       headers: {
@@ -317,7 +317,7 @@ export class LiveDataService {
     this.latestDeploymentsInterval = setInterval(async () => {
       let latestDeploymentsData: LatestDeploymentsResponse;
 
-      if (process.env.MOCK_DATA !== 'true') {
+      if (isMockDataMode) {
         try {
           latestDeploymentsData = await requestLatestDeployments(
             railwayProjectId
@@ -336,7 +336,7 @@ export class LiveDataService {
         );
 
       if (
-        process.env.MOCK_DATA === 'true' ||
+        isMockDataMode ||
         JSON.stringify(this.latestDeployments) !==
           JSON.stringify(latestDeployments)
       ) {
