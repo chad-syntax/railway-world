@@ -49,7 +49,7 @@ export class VolumeStructure extends WorldObject {
       this.volume.name,
       {
         x: 0,
-        y: this.height,
+        y: this.height + 0.25,
         z: 0,
       },
       {
@@ -72,6 +72,7 @@ export class VolumeStructure extends WorldObject {
     });
 
     this.wireframeMesh = new THREE.Mesh(geometry, wireframeMaterial);
+    this.wireframeMesh.position.y = this.height / 2;
     this.group.add(this.wireframeMesh);
 
     // Create inner volume cube that shows usage
@@ -79,7 +80,7 @@ export class VolumeStructure extends WorldObject {
 
     const innerGeometry = new THREE.BoxGeometry(
       this.width,
-      innerHeight + 0.001,
+      innerHeight,
       this.depth
     );
 
@@ -116,14 +117,13 @@ export class VolumeStructure extends WorldObject {
     const usageTextMesh = new THREE.Mesh(usageTextGeometry, usageTextMaterial);
 
     // Position on top face of the inner volume cube
-    const innerTopPosition = (innerHeight - this.height) / 2 + innerHeight / 2;
-    usageTextMesh.position.set(0, innerTopPosition + 0.002, 0); // Small offset to prevent z-fighting
+    usageTextMesh.position.set(0, innerHeight + 0.002, 0); // Small offset to prevent z-fighting
     usageTextMesh.rotation.x = -Math.PI / 2; // Rotate to lay flat on top
     this.group.add(usageTextMesh);
 
     this.innerVolumeMesh = new THREE.Mesh(innerGeometry, innerMaterial);
     // Position inner volume at bottom of wireframe
-    this.innerVolumeMesh.position.y = (innerHeight - this.height) / 2;
+    this.innerVolumeMesh.position.y = innerHeight / 2 + 0.001;
     this.group.add(this.innerVolumeMesh);
 
     this.group.position.set(this.position.x, this.position.y, this.position.z);
@@ -166,7 +166,7 @@ export class VolumeStructure extends WorldObject {
       this.iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
 
       // Position icon on front face
-      this.iconMesh.position.set(0, 0, this.depth / 2 + 0.01);
+      this.iconMesh.position.set(0, this.height / 2, this.depth / 2 + 0.01);
       this.group.add(this.iconMesh);
     };
 

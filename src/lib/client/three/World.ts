@@ -23,7 +23,9 @@ import {
   WORLD_GRASS_GREEN,
   WORLD_ORANGE,
   CONNECTION_BLUE,
+  VOLUME_YELLOW,
 } from '../../../lib/colors';
+import { mockHttpLogs } from '../../mock-data';
 
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
@@ -61,7 +63,7 @@ export class World {
     down: false,
     shift: false,
   };
-
+  private requestBlockSpawnOffset = 0;
   private SPEED = 30.0;
   private JUMP_SPEED = 15.0;
 
@@ -79,6 +81,7 @@ export class World {
       0.1,
       1000
     );
+
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -109,7 +112,7 @@ export class World {
     );
 
     this.ground.rotation.x = Math.PI / 2;
-    this.ground.position.y = 0;
+    this.ground.position.y = -0.01;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
 
@@ -123,7 +126,7 @@ export class World {
     );
 
     // Set initial position
-    this.camera.position.set(0, 2, 10);
+    this.camera.position.set(0, 10, 20);
 
     // Set up click listener to enable pointer lock
     document.addEventListener('click', () => {
@@ -148,6 +151,12 @@ export class World {
     this.wsClient.onMessage('latestDeployments', this.handleLatestDeployments);
 
     this.populate();
+
+    // test code for my specific project
+    // this.populateRequest(this.railwayData.services[2], mockHttpLogs);
+    // setInterval(() => {
+    //   this.populateRequest(this.railwayData.services[2], mockHttpLogs);
+    // }, 10000);
   }
 
   private handleLogs = (event: WebSocketLogsEvent) => {
@@ -269,24 +278,34 @@ export class World {
 
     logs.forEach((log, index) => {
       setTimeout(() => {
+        // Calculate angle in radians (increment by 45 degrees / π/4 radians each time)
+        const angle = (this.requestBlockSpawnOffset * Math.PI) / 4;
+
+        // Calculate position on circle with radius 1
+        const offsetX = Math.cos(angle) * 0.75;
+        const offsetZ = Math.sin(angle) * 0.75;
+
         const requestBlock = new RequestBlock({
           service,
           log,
           world: this,
           position: {
-            x: startPos.x,
+            x: startPos.x + offsetX,
             y: startPos.y,
-            z: startPos.z,
+            z: startPos.z + offsetZ,
           },
           endPosition: {
-            x: endPos.x,
+            x: endPos.x + offsetX,
             y: endPos.y,
-            z: endPos.z,
+            z: endPos.z + offsetZ,
           },
         });
 
         this.addObject(requestBlock);
-      }, index * 500); // Add 500ms delay between requests
+
+        // Increment offset for next request (reset after 8 to start over)
+        this.requestBlockSpawnOffset = (this.requestBlockSpawnOffset + 1) % 8;
+      }, index * 500);
     });
   }
 
@@ -321,15 +340,12 @@ export class World {
 
     this.addObject(authorBillboard);
 
-    const services = this.railwayData.services;
-
-    // Calculate layout parameters
-    const spacing = 7.5; // Space between serviceStructures
-    const startX = -((services.length - 1) * spacing) / 2; // Center the serviceStructures
+    const servicePositions = this.determineServicePositions();
 
     // Combined loop to create serviceStructures, volumes, globes and handle connections
-    services.forEach((service: Service, index: number) => {
-      const xPosition = startX + index * spacing;
+    servicePositions.forEach((servicePosition) => {
+      const { service, x, z } = servicePosition;
+
       const serviceName = service.name;
 
       // Create serviceStructure with service information
@@ -338,9 +354,9 @@ export class World {
         world: this,
         service,
         position: {
-          x: xPosition,
+          x,
           y: 0,
-          z: 0,
+          z,
         },
         deployment: service.latestDeployment,
       });
@@ -350,7 +366,9 @@ export class World {
 
       // If the service has a volume, create a VolumeStructure
       if (service.volume) {
-        const volumeX = xPosition + serviceStructure.width / 2 + 1.5; // Position to the right of the service
+        const volumeX = x + serviceStructure.width / 2 - 0.5; // Position above back right corner of serviceStructure
+        const volumeY = serviceStructure.height + 3;
+        const volumeZ = z - 1;
 
         // Create the VolumeStructure
         const volumeStructure = new VolumeStructure({
@@ -359,8 +377,8 @@ export class World {
           volume: service.volume,
           position: {
             x: volumeX,
-            y: 0.5, // Half the height (1) to place it properly above ground
-            z: 1,
+            y: volumeY,
+            z: volumeZ,
           },
         });
 
@@ -374,8 +392,9 @@ export class World {
 
       // If we have domains, create a globe for them
       if (service.domains && service.domains.length > 0) {
-        const globeX = xPosition;
-        const globeZ = -10; // Place it behind the serviceStructure
+        const globeX = x;
+        const globeZ = z;
+        const globeY = 20;
 
         // Create the InternetGlobe
         const globe = new InternetGlobe({
@@ -383,7 +402,7 @@ export class World {
           world: this,
           position: {
             x: globeX,
-            y: 0,
+            y: globeY,
             z: globeZ,
           },
           domains: service.domains,
@@ -397,21 +416,19 @@ export class World {
         // Create a connection between the globe and serviceStructure
         this.createConnectionBetween(globe, serviceStructure, {});
       }
+    });
 
+    this.railwayData.services.forEach((service) => {
       if (service.connections && service.connections.length > 0) {
         for (const targetServiceId of service.connections) {
-          const targetServiceStructure =
-            this.serviceStructures.get(targetServiceId);
+          const startPointObject = this.serviceStructures.get(service.id);
+          const endPointObject = this.serviceStructures.get(targetServiceId);
 
           // Create a connection if the target serviceStructure exists
-          if (targetServiceStructure) {
-            this.createConnectionBetween(
-              serviceStructure,
-              targetServiceStructure,
-              {
-                color: WORLD_GRASS_GREEN, // Green for service-to-service connections
-              }
-            );
+          if (startPointObject && endPointObject) {
+            this.createConnectionBetween(startPointObject, endPointObject, {
+              color: VOLUME_YELLOW, // Green for service-to-service connections
+            });
           }
         }
       }
@@ -419,6 +436,133 @@ export class World {
 
     this.populated = true;
   }
+
+  private determineServicePositions = () => {
+    const MIN_DISTANCE = 6; // 3 units structure + 3 units spacing
+    const occupiedPositions = new Set<string>();
+    const servicePositions: Array<{ service: Service; x: number; z: number }> =
+      [];
+
+    // Helper to check if a position is available
+    const isPositionAvailable = (x: number, z: number): boolean => {
+      const key = `${Math.round(x)},${Math.round(z)}`;
+      return !occupiedPositions.has(key);
+    };
+
+    // Helper to mark a position as occupied
+    const markPosition = (x: number, z: number) => {
+      const key = `${Math.round(x)},${Math.round(z)}`;
+      occupiedPositions.add(key);
+    };
+
+    // Calculate number of connections for each service
+    const connectionCounts = new Map<string, number>();
+    this.railwayData.services.forEach((service) => {
+      connectionCounts.set(service.id, (service.connections || []).length);
+    });
+
+    // Sort services by connection count (hubs first)
+    const sortedServices = [...this.railwayData.services].sort((a, b) => {
+      return (
+        (connectionCounts.get(b.id) || 0) - (connectionCounts.get(a.id) || 0)
+      );
+    });
+
+    // Place first hub at origin
+    if (sortedServices.length > 0) {
+      servicePositions.push({
+        service: sortedServices[0],
+        x: 0,
+        z: 0,
+      });
+      markPosition(0, 0);
+    }
+
+    // Helper to get available position around a center point
+    const findAvailablePosition = (
+      centerX: number,
+      centerZ: number,
+      radius: number
+    ): { x: number; z: number } | null => {
+      // Define positions in grid pattern - cardinal directions first, then diagonals
+      const positions = [
+        { x: centerX + radius, z: centerZ }, // right
+        { x: centerX, z: centerZ + radius }, // down
+        { x: centerX - radius, z: centerZ }, // left
+        { x: centerX, z: centerZ - radius }, // up
+        { x: centerX + radius, z: centerZ + radius }, // right-down
+        { x: centerX - radius, z: centerZ + radius }, // left-down
+        { x: centerX - radius, z: centerZ - radius }, // left-up
+        { x: centerX + radius, z: centerZ - radius }, // right-up
+      ];
+
+      for (const pos of positions) {
+        if (isPositionAvailable(pos.x, pos.z)) {
+          return pos;
+        }
+      }
+      return null;
+    };
+
+    // Place remaining services
+    for (let i = 1; i < sortedServices.length; i++) {
+      const service = sortedServices[i];
+      const connections = service.connections || [];
+
+      // Find connected services that are already placed
+      const connectedPositions = connections
+        .map((id) => servicePositions.find((pos) => pos.service.id === id))
+        .filter((pos) => pos !== undefined);
+
+      if (connectedPositions.length > 0) {
+        // Calculate average position of connected services
+        const avgX =
+          connectedPositions.reduce((sum, pos) => sum + pos!.x, 0) /
+          connectedPositions.length;
+        const avgZ =
+          connectedPositions.reduce((sum, pos) => sum + pos!.z, 0) /
+          connectedPositions.length;
+
+        // Try to find position around this average point
+        let radius = MIN_DISTANCE;
+        let position = null;
+
+        while (!position && radius < 50) {
+          position = findAvailablePosition(avgX, avgZ, radius);
+          radius += MIN_DISTANCE;
+        }
+
+        if (position) {
+          servicePositions.push({
+            service,
+            x: position.x,
+            z: position.z,
+          });
+          markPosition(position.x, position.z);
+        }
+      } else {
+        // No connections, place in next available position from origin
+        let radius = MIN_DISTANCE;
+        let position = null;
+
+        while (!position && radius < 50) {
+          position = findAvailablePosition(0, 0, radius);
+          radius += MIN_DISTANCE;
+        }
+
+        if (position) {
+          servicePositions.push({
+            service,
+            x: position.x,
+            z: position.z,
+          });
+          markPosition(position.x, position.z);
+        }
+      }
+    }
+
+    return servicePositions;
+  };
 
   private updateControls = (delta: number) => {
     if (!this.controls.isLocked) return;
@@ -529,32 +673,17 @@ export class World {
       color?: number;
     } = {}
   ): ConnectionLine {
-    // Calculate center points based on object type and position
-    const getObjectCenterY = (obj: WorldObject) => {
-      if (obj instanceof InternetGlobe) {
-        // Globe is positioned at y=0 but its center should be at 0
-        return 0;
-      } else if (obj instanceof VolumeStructure) {
-        // Volume is positioned at y=0.5, and its center should be at 0
-        return 0;
-      } else {
-        // Service structure is positioned at y=0, center should be at height/2
-        return (obj as any).height / 2;
-      }
-    };
-
-    const startY = getObjectCenterY(startObject);
-    const endY = getObjectCenterY(endObject);
+    const lineRadius = options.lineRadius || 0.02;
 
     // Define connection points at the center of each object
     const startPoint: ConnectionPoint = {
       worldObject: startObject,
-      localPosition: new THREE.Vector3(0, startY, 0),
+      localPosition: new THREE.Vector3(0, lineRadius, 0),
     };
 
     const endPoint: ConnectionPoint = {
       worldObject: endObject,
-      localPosition: new THREE.Vector3(0, endY, 0),
+      localPosition: new THREE.Vector3(0, lineRadius, 0),
     };
 
     // Create a unique name for the connection
@@ -567,7 +696,7 @@ export class World {
       position: { x: 0, y: 0, z: 0 }, // Position doesn't matter - it's determined by connected objects
       startPoint,
       endPoint,
-      lineRadius: options.lineRadius || 0.02,
+      lineRadius,
       color: options.color || CONNECTION_BLUE,
     });
 

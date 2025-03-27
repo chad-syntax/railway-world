@@ -185,7 +185,7 @@ export class LiveDataService {
   };
 
   private sendGqlSubscriptionsCommand = (deploymentId: string) => {
-    if (this.gqlDeploymentSubscriptions.has(deploymentId)) {
+    if (this.gqlDeploymentSubscriptions.has(deploymentId) || isMockDataMode) {
       return;
     }
 
@@ -317,7 +317,7 @@ export class LiveDataService {
     this.latestDeploymentsInterval = setInterval(async () => {
       let latestDeploymentsData: LatestDeploymentsResponse;
 
-      if (isMockDataMode) {
+      if (!isMockDataMode) {
         try {
           latestDeploymentsData = await requestLatestDeployments(
             railwayProjectId

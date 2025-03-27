@@ -88,12 +88,12 @@ export class RequestBlock extends WorldObject {
     // Calculate cube size based on tx and rx bytes
     const totalBytes = (this.log.txBytes || 0) + (this.log.rxBytes || 0);
     // Normalize bytes to a reasonable cube size (0.02 units per 100 bytes, with min and max sizes)
-    const baseSize = 0.02;
-    const bytesScale = Math.min(Math.max(totalBytes / 1000, baseSize), 5);
+    const baseSize = 0.1;
+    const bytesScale = Math.min(Math.max(totalBytes / 1000, baseSize), 3);
     this.cubeSize = baseSize + bytesScale * 0.25 + Math.random() * 0.05;
 
     // Invert speed calculation - shorter durations move faster
-    this.speed = Math.min(Math.max(100 / (log.totalDuration || 1), 1), 5);
+    this.speed = Math.min(Math.max(100 / (log.totalDuration || 1), 0.8), 8);
 
     this.createBlock();
 
@@ -136,55 +136,6 @@ export class RequestBlock extends WorldObject {
     } else {
       return 'DOC';
     }
-  }
-
-  private createTextTexture2(
-    text: string,
-    size: number = 128,
-    baseColor: number
-  ): CanvasTexture {
-    // Create a canvas to render the text
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-
-    // Set canvas dimensions
-    canvas.width = size;
-    canvas.height = size;
-
-    // Convert hex color to rgba string
-    const r = (baseColor >> 16) & 255;
-    const g = (baseColor >> 8) & 255;
-    const b = baseColor & 255;
-    const fillColor = `rgba(${r}, ${g}, ${b}, 1.0)`;
-
-    // Clear the canvas
-    context.fillStyle = fillColor;
-    context.fillRect(0, 0, size, size);
-
-    // Set text properties
-    const fontSize = Math.floor(size / 3);
-    context.font = `bold ${fontSize}px monospace`;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    // Add shadow for better visibility
-    context.shadowColor = 'rgba(0, 0, 0, 0.7)';
-    context.shadowBlur = 4;
-    context.shadowOffsetX = 2;
-    context.shadowOffsetY = 2;
-
-    // Draw text
-    context.fillStyle = UI_WHITE_HEX;
-    context.fillText(text, size / 2, size / 2);
-
-    // Create a texture from the canvas
-    const texture = new CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    texture.minFilter = LinearFilter;
-    texture.magFilter = LinearFilter;
-    texture.generateMipmaps = false;
-
-    return texture;
   }
 
   private createBlock() {
@@ -238,11 +189,21 @@ export class RequestBlock extends WorldObject {
     });
 
     const { texture: methodTexture } = this.createTextTexture(this.log.method, {
-      fontSize: 94,
+      fontSize: 78,
       canvasWidth: 256,
       canvasHeight: 256,
       strokeWidth: 6,
     });
+
+    const { texture: statusTexture } = this.createTextTexture(
+      this.log.httpStatus.toString(),
+      {
+        fontSize: 112,
+        canvasWidth: 256,
+        canvasHeight: 256,
+        strokeWidth: 6,
+      }
+    );
 
     // Create materials for the text planes
     const textMaterial = new MeshBasicMaterial({
@@ -255,6 +216,11 @@ export class RequestBlock extends WorldObject {
       transparent: true,
     });
 
+    const statusMaterial = new MeshBasicMaterial({
+      map: statusTexture,
+      transparent: true,
+    });
+
     // Create planes for the text
     const textSize = this.cubeSize * 0.8; // Slightly smaller than cube size
     const textGeometry = new PlaneGeometry(textSize, textSize);
@@ -264,8 +230,8 @@ export class RequestBlock extends WorldObject {
     const methodBackMesh = new Mesh(textGeometry, methodMaterial);
 
     // Position method text on front and back faces
-    methodFrontMesh.position.set(0, 0, this.cubeSize / 2 + 0.02);
-    methodBackMesh.position.set(0, 0, -this.cubeSize / 2 - 0.02);
+    methodFrontMesh.position.set(0, 0, this.cubeSize / 2 + 0.01);
+    methodBackMesh.position.set(0, 0, -this.cubeSize / 2 - 0.01);
     methodBackMesh.rotation.y = Math.PI; // Rotate to face outward
     this.group.add(methodFrontMesh);
     this.group.add(methodBackMesh);
@@ -275,12 +241,19 @@ export class RequestBlock extends WorldObject {
     const typeRightMesh = new Mesh(textGeometry, textMaterial);
 
     // Position type text on left and right faces
-    typeLeftMesh.position.set(-this.cubeSize / 2 - 0.02, 0, 0);
+    typeLeftMesh.position.set(-this.cubeSize / 2 - 0.01, 0, 0);
     typeLeftMesh.rotation.y = -Math.PI / 2; // Rotate to face left
-    typeRightMesh.position.set(this.cubeSize / 2 + 0.02, 0, 0);
+    typeRightMesh.position.set(this.cubeSize / 2 + 0.01, 0, 0);
     typeRightMesh.rotation.y = Math.PI / 2; // Rotate to face right
+
+    // Create status code mesh for the top of the cube
+    const statusMesh = new Mesh(textGeometry, statusMaterial);
+    statusMesh.position.set(0, this.cubeSize / 2 + 0.01, 0);
+    statusMesh.rotation.x = -Math.PI / 2; // Rotate to face outward
+
     this.group.add(typeLeftMesh);
     this.group.add(typeRightMesh);
+    this.group.add(statusMesh);
   }
 
   onUpdate(delta: number) {
@@ -326,7 +299,7 @@ export class RequestBlock extends WorldObject {
     } else {
       // After animation is complete, wait then remove
       if (this.waitStartTime) {
-        const waitElapsed = (Date.now() - this.waitStartTime) / 1000;
+        const waitElapsed = (Date.now() - this.waitStartTime) / 100;
         if (waitElapsed > 1.0) {
           // Wait 1 second before removal
           // Remove from scene and world's objects map

@@ -162,7 +162,7 @@ export class ServiceStructure extends WorldObject {
     this.addSvcLabel();
 
     // Position the entire group
-    this.group.position.set(this.position.x, 0, this.position.z);
+    this.group.position.set(this.position.x, this.position.y, this.position.z);
 
     this.world.wsClient.onMessage(
       'latestDeployments',

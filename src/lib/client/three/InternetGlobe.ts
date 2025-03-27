@@ -37,7 +37,7 @@ export class InternetGlobe extends WorldObject {
     this.createDomainText();
 
     // Position the globe at ground level
-    this.group.position.set(this.position.x, this.globeHeight, this.position.z);
+    this.group.position.set(this.position.x, this.position.y, this.position.z);
 
     // Create sprite text above the globe
     this.createLabel('Internet', {
