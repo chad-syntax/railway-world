@@ -19,8 +19,7 @@ export class InternetGlobe extends WorldObject {
 
   private globe!: THREE.Mesh; // Using the definite assignment assertion
   private domainText: THREE.Object3D[] = [];
-  private globeRadius = 1.5;
-  private globeHeight = 1.5; // Equal to globeRadius so bottom of globe rests on ground level
+  private globeRadius = 3;
 
   constructor(options: InternetGlobeConstructorOptions) {
     super(options);
@@ -40,11 +39,17 @@ export class InternetGlobe extends WorldObject {
     this.group.position.set(this.position.x, this.position.y, this.position.z);
 
     // Create sprite text above the globe
-    this.createLabel('Internet', {
-      x: 0,
-      y: this.globeRadius + 0.5,
-      z: 0,
-    });
+    this.createLabel(
+      'Internet',
+      {
+        x: 0,
+        y: this.globeRadius * 2 + 2,
+        z: 0,
+      },
+      {
+        fontSize: 256,
+      }
+    );
   }
 
   private createGlobe(): void {
@@ -67,6 +72,7 @@ export class InternetGlobe extends WorldObject {
       32,
       32
     );
+
     const innerMaterial = new THREE.MeshStandardMaterial({
       color: UI_WHITE,
       transparent: true,
@@ -75,10 +81,13 @@ export class InternetGlobe extends WorldObject {
 
     const innerSphere = new THREE.Mesh(innerGeometry, innerMaterial);
 
+    innerSphere.position.y = this.globeRadius;
+
     // Create the globe mesh
     this.globe = new THREE.Mesh(geometry, material);
     this.globe.castShadow = true;
     this.globe.receiveShadow = true;
+    this.globe.position.y = this.globeRadius;
 
     // Add both spheres to the group
     this.group.add(this.globe);
@@ -107,15 +116,16 @@ export class InternetGlobe extends WorldObject {
 
     // Create a ring around the equator
     const ringGeometry = new THREE.CylinderGeometry(
-      this.globeRadius + 0.05, // radiusTop
-      this.globeRadius + 0.05, // radiusBottom
-      0.3, // height
-      32, // radialSegments
+      this.globeRadius + 0.5, // radiusTop
+      this.globeRadius + 0.5, // radiusBottom
+      0.65, // height
+      64, // radialSegments
       1, // heightSegments
       true // openEnded
     );
 
     const ring = new THREE.Mesh(ringGeometry, material);
+    ring.position.y = this.globeRadius;
     ring.rotation.y = Math.PI / 2; // Rotate to align with equator
 
     // Add to group and track for rotation updates

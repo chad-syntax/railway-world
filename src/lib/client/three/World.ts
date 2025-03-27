@@ -153,10 +153,10 @@ export class World {
     this.populate();
 
     // test code for my specific project
-    // this.populateRequest(this.railwayData.services[2], mockHttpLogs);
-    // setInterval(() => {
-    //   this.populateRequest(this.railwayData.services[2], mockHttpLogs);
-    // }, 10000);
+    this.populateRequest(this.railwayData.services[2], mockHttpLogs);
+    setInterval(() => {
+      this.populateRequest(this.railwayData.services[2], mockHttpLogs);
+    }, 10000);
   }
 
   private handleLogs = (event: WebSocketLogsEvent) => {
@@ -291,7 +291,7 @@ export class World {
           world: this,
           position: {
             x: startPos.x + offsetX,
-            y: startPos.y,
+            y: startPos.y + 1,
             z: startPos.z + offsetZ,
           },
           endPosition: {
@@ -414,7 +414,7 @@ export class World {
         this.addObject(globe);
 
         // Create a connection between the globe and serviceStructure
-        this.createConnectionBetween(globe, serviceStructure, {});
+        this.createConnectionBetween(globe, serviceStructure);
       }
     });
 
