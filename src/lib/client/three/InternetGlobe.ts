@@ -18,7 +18,7 @@ export class InternetGlobe extends WorldObject {
   public serviceId: string;
 
   private globe!: THREE.Mesh; // Using the definite assignment assertion
-  private domainText: THREE.Object3D[] = [];
+  private domainRing!: THREE.Object3D;
   private globeRadius = 3;
 
   constructor(options: InternetGlobeConstructorOptions) {
@@ -92,6 +92,7 @@ export class InternetGlobe extends WorldObject {
     // Add both spheres to the group
     this.group.add(this.globe);
     this.group.add(innerSphere);
+    this.group.rotation.y = -Math.PI / 2;
   }
 
   private createDomainText(): void {
@@ -124,26 +125,24 @@ export class InternetGlobe extends WorldObject {
       true // openEnded
     );
 
-    const ring = new THREE.Mesh(ringGeometry, material);
-    ring.position.y = this.globeRadius;
-    ring.rotation.y = Math.PI / 2; // Rotate to align with equator
+    this.domainRing = new THREE.Mesh(ringGeometry, material);
+    this.domainRing.position.y = this.globeRadius;
+    this.domainRing.rotation.y = Math.PI / 2; // Rotate to align with equator
+    this.domainRing.rotation.x = -Math.PI / 36;
 
     // Add to group and track for rotation updates
-    this.group.add(ring);
-    this.domainText.push(ring);
+    this.group.add(this.domainRing);
   }
 
   // The globe should slowly rotate
   onUpdate(delta: number): void {
-    if (this.globe) {
-      // Rotate around Y axis
-      this.globe.rotation.y += delta * 0.25;
+    // rotate the globe (inner and outer)
+    this.globe.rotation.y += delta * 0.25;
 
-      // Update the domain text rotation to remain visible
-      this.domainText.forEach((text) => {
-        // This keeps the text facing the camera by counteracting the globe's rotation
-        text.rotation.y = -(this.globe.rotation.y * 2);
-      });
-    }
+    // rotate the domain ring
+    this.domainRing.rotation.y = -(this.globe.rotation.y * 2);
+
+    // rotate the whole group slightly
+    this.group.rotation.y += (-Math.PI / 36) * delta;
   }
 }
