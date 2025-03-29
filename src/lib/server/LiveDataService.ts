@@ -16,7 +16,12 @@ import {
   requestLatestDeployments,
 } from './graphql/latest-deployments-query';
 import { config } from 'dotenv';
-import { mockLatestDeployments, mockRailwayData } from '../mock-data';
+import {
+  mockHttpLogs,
+  mockLatestDeployments,
+  mockRailwayData,
+  MOCK_HTTP_LOG_DEPLOYMENT_ID,
+} from '../mock-data';
 import { wait } from '../utils';
 
 config();
@@ -66,7 +71,7 @@ export class LiveDataService {
   private attempts: number = 0;
   private latestDeploymentsIntervalMs: number = 5 * 1000; // every 5 seconds, more will surpass rate limit
   private railwayDataAttempts: number = 0;
-
+  private mockHttpLogsInterval: NodeJS.Timeout | null = null;
   constructor() {
     this.railwayDataPromise = this.initializeRailwayData();
   }
@@ -292,7 +297,22 @@ export class LiveDataService {
   };
 
   private startGqlSubscriptionForLogs() {
-    if (this.gqlWs || isMockDataMode) return;
+    if (this.gqlWs) return;
+
+    if (isMockDataMode) {
+      // send mock http logs
+      this.mockHttpLogsInterval = setInterval(() => {
+        this.clientConnections.forEach((conn) => {
+          this.sendClientMessage(conn, {
+            eventName: 'logs',
+            deploymentId: MOCK_HTTP_LOG_DEPLOYMENT_ID,
+            logs: mockHttpLogs,
+          });
+        });
+      }, 10000);
+
+      return;
+    }
 
     this.gqlWs = new WebSocket(GRAPHQL_WS_API_URL, ['graphql-transport-ws'], {
       headers: {
@@ -376,6 +396,11 @@ export class LiveDataService {
   }
 
   private stopGqlSubscriptionForLogs() {
+    if (this.mockHttpLogsInterval) {
+      clearInterval(this.mockHttpLogsInterval);
+      this.mockHttpLogsInterval = null;
+    }
+
     this.attempts = 0;
     if (this.gqlWs) {
       this.isIntentionalClose = true;

@@ -151,12 +151,6 @@ export class World {
     this.wsClient.onMessage('latestDeployments', this.handleLatestDeployments);
 
     this.populate();
-
-    // test code for my specific project
-    this.populateRequest(this.railwayData.services[2], mockHttpLogs);
-    setInterval(() => {
-      this.populateRequest(this.railwayData.services[2], mockHttpLogs);
-    }, 10000);
   }
 
   private handleLogs = (event: WebSocketLogsEvent) => {

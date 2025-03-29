@@ -12,8 +12,6 @@ const run = (railwayData: RailwayData) => {
 
   const world = new World({ htmlRoot: $root, wsClient, railwayData });
 
-  // world.populate(railwayData);
-
   // Start animation loop
   let prevTime = performance.now();
 

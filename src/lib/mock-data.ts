@@ -1,3 +1,4 @@
+import { HttpLog } from './types';
 import { LatestDeploymentsResponse } from './server/graphql/latest-deployments-query';
 
 export const mockRailwayData = {
@@ -545,7 +546,8 @@ export const mockLatestDeployments: LatestDeploymentsResponse = {
   },
 };
 
-import { HttpLog } from './types';
+export const MOCK_HTTP_LOG_DEPLOYMENT_ID =
+  '3a59d66d-6d41-49f4-a029-8c22d1e011ca';
 
 export const mockHttpLogs: HttpLog[] = [
   {
