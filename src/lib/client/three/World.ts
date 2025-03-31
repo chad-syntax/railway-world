@@ -576,4 +576,9 @@ export class World {
   public get maxAnisotropy(): number {
     return this.renderer.capabilities.getMaxAnisotropy();
   }
+
+  // Add getter for scene
+  public getScene(): THREE.Scene {
+    return this.scene;
+  }
 }

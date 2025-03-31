@@ -688,4 +688,8 @@ export class ServiceStructure extends WorldObject {
       this.updateFireAnimation(delta);
     }
   }
+
+  onInteract(): void {
+    console.log('onInteract', this.name);
+  }
 }

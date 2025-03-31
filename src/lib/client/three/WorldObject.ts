@@ -165,7 +165,7 @@ export abstract class WorldObject {
     this.group.add(sprite);
   }
 
-  createTextTexture(
+  protected createTextTexture(
     text: string | string[],
     options: CreateTextTextureOptions = DEFAULT_TEXT_TEXTURE_OPTIONS
   ) {

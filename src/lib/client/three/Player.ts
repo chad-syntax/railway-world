@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { WorldObject } from './WorldObject';
 import { World } from './World';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
+import { UI_WHITE } from '../../colors';
 
 type PlayerConstructorOptions = {
   world: World;
@@ -10,6 +11,7 @@ type PlayerConstructorOptions = {
 export class Player extends WorldObject {
   public camera: THREE.PerspectiveCamera;
   private static readonly PLAYER_HEIGHT = 1.7; // Average human height in meters
+  private static readonly INTERACTION_DISTANCE = 5.0; // Maximum distance for interaction
 
   // Movement speeds
   private static readonly NORMAL_SPEED = 30.0;
@@ -39,6 +41,12 @@ export class Player extends WorldObject {
   private GRAVITY = 9.8;
   private isGrounded = false;
   private verticalVelocity = 0;
+
+  // Interaction system
+  private raycaster: THREE.Raycaster;
+  private crosshair!: THREE.Group;
+  private currentInteractable: WorldObject | null = null;
+  private interactionPrompt: THREE.Sprite | null = null;
 
   constructor(options: PlayerConstructorOptions) {
     const { world } = options;
@@ -81,8 +89,152 @@ export class Player extends WorldObject {
     this.velocity = new THREE.Vector3();
     this.direction = new THREE.Vector3();
 
+    // Initialize interaction system
+    this.raycaster = new THREE.Raycaster();
+    this.createCrosshair();
+    this.createInteractionPrompt();
+
     // Extend controls to add update method
     this.controls.update = this.updateControls;
+  }
+
+  private createCrosshair(): void {
+    // Create a crosshair using thin planes
+    const size = 0.1; // Small size
+    const thickness = 0.01; // Line thickness
+
+    // Create vertical line
+    const verticalGeometry = new THREE.PlaneGeometry(thickness, size * 2);
+    const horizontalGeometry = new THREE.PlaneGeometry(size * 2, thickness);
+
+    const material = new THREE.MeshBasicMaterial({
+      color: UI_WHITE,
+      depthTest: false, // Don't test against depth buffer
+      depthWrite: false, // Don't write to depth buffer
+      transparent: true, // Make it transparent
+      opacity: 0.65, // But fully opaque
+    });
+
+    // Create the crosshair by combining both lines
+    this.crosshair = new THREE.Group();
+    const verticalLine = new THREE.Mesh(verticalGeometry, material);
+    const horizontalLine = new THREE.Mesh(horizontalGeometry, material);
+
+    // Set render order on the lines
+    verticalLine.renderOrder = 999;
+    horizontalLine.renderOrder = 999;
+
+    this.crosshair.add(verticalLine);
+    this.crosshair.add(horizontalLine);
+
+    // Add to player's group
+    this.group.add(this.crosshair);
+
+    // Make sure it's visible
+    this.crosshair.renderOrder = 999;
+
+    // Set initial position
+    const forward = new THREE.Vector3(0, 0, -1);
+    forward.applyQuaternion(this.camera.quaternion);
+    this.crosshair.position.copy(this.camera.position);
+    this.crosshair.position.add(forward.multiplyScalar(5));
+  }
+
+  private createInteractionPrompt(): void {
+    // Create a canvas for the text
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = 256;
+    canvas.height = 64;
+
+    // Clear the canvas with a transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Configure text settings
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.font = 'bold 32px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Draw text with outline
+    ctx.strokeText('Press E to interact', canvas.width / 2, canvas.height / 2);
+    ctx.fillText('Press E to interact', canvas.width / 2, canvas.height / 2);
+
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+
+    // Create sprite material
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+    });
+
+    // Create sprite
+    this.interactionPrompt = new THREE.Sprite(material);
+    this.interactionPrompt.scale.set(2, 0.5, 1);
+    this.interactionPrompt.visible = false;
+
+    // Add to camera
+    this.camera.add(this.interactionPrompt);
+  }
+
+  private updateInteraction(): void {
+    if (!this.controls.isLocked) return;
+
+    // Update the picking ray with the camera and mouse position
+    this.raycaster.setFromCamera(new THREE.Vector2(), this.camera);
+
+    // Find objects intersecting the ray
+    const intersects = this.raycaster.intersectObjects(
+      this.world.getScene().children,
+      true
+    );
+
+    console.log(intersects);
+
+    // Find the first intersected object that has an onInteract method
+    const interactable = intersects.find((intersect) => {
+      let currentObject: THREE.Object3D | null = intersect.object;
+      while (currentObject && !(currentObject instanceof WorldObject)) {
+        currentObject = currentObject.parent;
+      }
+      return (
+        currentObject instanceof WorldObject && 'onInteract' in currentObject
+      );
+    });
+
+    if (interactable) {
+      let currentObject: THREE.Object3D | null = interactable.object;
+      while (currentObject && !(currentObject instanceof WorldObject)) {
+        currentObject = currentObject.parent;
+      }
+      if (
+        currentObject instanceof WorldObject &&
+        'onInteract' in currentObject
+      ) {
+        this.currentInteractable = currentObject;
+        if (this.interactionPrompt) {
+          this.interactionPrompt.visible = true;
+          // Position the prompt slightly above the crosshair
+          this.interactionPrompt.position.set(0, 0.1, -0.1);
+        }
+      }
+    } else {
+      this.currentInteractable = null;
+      if (this.interactionPrompt) {
+        this.interactionPrompt.visible = false;
+      }
+    }
+  }
+
+  private handleInteraction(): void {
+    if (this.currentInteractable && 'onInteract' in this.currentInteractable) {
+      (this.currentInteractable as any).onInteract();
+    }
   }
 
   private updateControls = (delta: number) => {
@@ -155,6 +307,20 @@ export class Player extends WorldObject {
     // Move the camera
     this.controls.moveRight(this.velocity.x);
     this.controls.moveForward(this.velocity.z);
+
+    // Update crosshair to be 5 units in front of camera's direction
+    if (this.crosshair) {
+      // Get camera's forward direction
+      const forward = new THREE.Vector3(0, 0, -1);
+      forward.applyQuaternion(this.camera.quaternion);
+
+      // Calculate position 5 units in front
+      this.crosshair.position.copy(this.camera.position);
+      this.crosshair.position.add(forward.multiplyScalar(5));
+
+      // Make crosshair face camera
+      this.crosshair.lookAt(this.camera.position);
+    }
   };
 
   private toggleMode = () => {
@@ -210,6 +376,9 @@ export class Player extends WorldObject {
       case 'ShiftRight':
         this.moveState.shift = true;
         break;
+      case 'KeyE':
+        this.handleInteraction();
+        break;
     }
   };
 
@@ -248,5 +417,6 @@ export class Player extends WorldObject {
 
   onUpdate(delta: number) {
     this.controls.update(delta);
+    this.updateInteraction();
   }
 }

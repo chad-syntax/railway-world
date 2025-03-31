@@ -299,16 +299,18 @@ export class LiveDataService {
   private startGqlSubscriptionForLogs() {
     if (this.gqlWs) return;
 
-    if (isMockDataMode && !this.mockHttpLogsInterval) {
-      this.mockHttpLogsInterval = setInterval(() => {
-        this.clientConnections.forEach((conn) => {
-          this.sendClientMessage(conn, {
-            eventName: 'logs',
-            deploymentId: MOCK_HTTP_LOG_DEPLOYMENT_ID,
-            logs: mockHttpLogs,
+    if (isMockDataMode) {
+      if (!this.mockHttpLogsInterval) {
+        this.mockHttpLogsInterval = setInterval(() => {
+          this.clientConnections.forEach((conn) => {
+            this.sendClientMessage(conn, {
+              eventName: 'logs',
+              deploymentId: MOCK_HTTP_LOG_DEPLOYMENT_ID,
+              logs: mockHttpLogs,
+            });
           });
-        });
-      }, 10000);
+        }, 10000);
+      }
 
       return;
     }
