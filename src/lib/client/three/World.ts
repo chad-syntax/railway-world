@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { WorldObject } from './WorldObject';
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 import { ServiceStructure } from './ServiceStructure';
 import { InternetGlobe } from './InternetGlobe';
 import { ConnectionLine, ConnectionPoint } from './ConnectionLine';
@@ -25,7 +24,7 @@ import {
   CONNECTION_BLUE,
   VOLUME_YELLOW,
 } from '../../../lib/colors';
-import { mockHttpLogs } from '../../mock-data';
+import { Player } from './Player';
 
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
@@ -41,31 +40,18 @@ export class World {
   public volumes: Map<string, VolumeStructure> = new Map();
   public globes: Map<string, InternetGlobe> = new Map();
   public requestBlocks: Map<string, RequestBlock> = new Map();
+  public populated: boolean = false;
+  public renderer: THREE.WebGLRenderer;
 
+  private player: Player;
   private scene: THREE.Scene;
   private htmlRoot: HTMLElement;
-  private populated: boolean = false;
-  private camera: THREE.PerspectiveCamera;
-  private renderer: THREE.WebGLRenderer;
+
   private ambientLight: THREE.AmbientLight;
   private directionalLight: THREE.DirectionalLight;
   private ground: THREE.Mesh;
   private gridHelper: THREE.GridHelper;
-  private controls: PointerLockControls;
-  private velocity = new THREE.Vector3();
-  private direction = new THREE.Vector3();
-  private moveState = {
-    forward: false,
-    backward: false,
-    left: false,
-    right: false,
-    up: false,
-    down: false,
-    shift: false,
-  };
   private requestBlockSpawnOffset = 0;
-  private SPEED = 30.0;
-  private JUMP_SPEED = 15.0;
 
   constructor(options: WorldConstructorOptions) {
     const { htmlRoot, wsClient, railwayData } = options;
@@ -75,12 +61,6 @@ export class World {
     this.railwayData = railwayData;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(WORLD_SKY_BLUE);
-    this.camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -94,7 +74,7 @@ export class World {
     this.scene.add(this.ambientLight);
 
     this.directionalLight = new THREE.DirectionalLight(UI_WHITE, 1.2);
-    this.directionalLight.position.set(1, 1, 1);
+    this.directionalLight.position.set(1, 10, 1);
     this.directionalLight.castShadow = true;
     this.directionalLight.shadow.mapSize.width = 1024;
     this.directionalLight.shadow.mapSize.height = 1024;
@@ -120,29 +100,9 @@ export class World {
     this.gridHelper = new THREE.GridHelper(100, 100);
     this.scene.add(this.gridHelper);
 
-    this.controls = new PointerLockControls(
-      this.camera,
-      this.renderer.domElement
-    );
+    this.player = new Player({ world: this });
 
-    // Set initial position
-    this.camera.position.set(0, 10, 20);
-
-    // Set up click listener to enable pointer lock
-    document.addEventListener('click', () => {
-      if (this.populated) {
-        this.controls.lock();
-      }
-    });
-
-    document.addEventListener('keydown', this.onKeyDown);
-    document.addEventListener('keyup', this.onKeyUp);
-
-    this.velocity = new THREE.Vector3();
-    this.direction = new THREE.Vector3();
-
-    // Extend controls to add update method
-    this.controls.update = this.updateControls;
+    this.addObject(this.player);
 
     // Handle window resize
     window.addEventListener('resize', this.onResize);
@@ -226,13 +186,10 @@ export class World {
       object.onUpdate(delta);
     });
 
-    this.controls.update(delta);
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, this.player.camera);
   }
 
   private onResize = () => {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
 
@@ -556,106 +513,6 @@ export class World {
     }
 
     return servicePositions;
-  };
-
-  private updateControls = (delta: number) => {
-    if (!this.controls.isLocked) return;
-
-    // Calculate movement direction
-    this.velocity.x = 0;
-    this.velocity.y = 0;
-    this.velocity.z = 0;
-
-    this.direction.z =
-      Number(this.moveState.forward) - Number(this.moveState.backward);
-    this.direction.x =
-      Number(this.moveState.right) - Number(this.moveState.left);
-    this.direction.y = Number(this.moveState.up) - Number(this.moveState.down);
-    this.direction.normalize();
-
-    if (this.moveState.shift) {
-      this.SPEED = 5.0;
-    } else {
-      this.SPEED = 30.0;
-    }
-
-    if (this.moveState.shift) {
-      this.JUMP_SPEED = 5.0;
-    } else {
-      this.JUMP_SPEED = 15.0;
-    }
-
-    // Apply movement in the direction the camera is facing
-    if (this.moveState.forward || this.moveState.backward) {
-      this.velocity.z = this.direction.z * this.SPEED * delta;
-    }
-    if (this.moveState.left || this.moveState.right) {
-      this.velocity.x = this.direction.x * this.SPEED * delta;
-    }
-    if (this.moveState.up || this.moveState.down) {
-      this.velocity.y = this.direction.y * this.JUMP_SPEED * delta;
-    }
-
-    // Move the camera
-    this.controls.moveRight(this.velocity.x);
-    this.controls.moveForward(this.velocity.z);
-    this.camera.position.y += this.velocity.y;
-  };
-
-  private onKeyDown = (event: KeyboardEvent) => {
-    switch (event.code) {
-      case 'KeyW':
-        this.moveState.forward = true;
-        break;
-      case 'KeyS':
-        this.moveState.backward = true;
-        break;
-      case 'KeyA':
-        this.moveState.left = true;
-        break;
-      case 'KeyD':
-        this.moveState.right = true;
-        break;
-      case 'Space':
-        this.moveState.up = true;
-        break;
-      case 'ControlLeft':
-      case 'ControlRight':
-        this.moveState.down = true;
-        break;
-      case 'ShiftLeft':
-      case 'ShiftRight':
-        this.moveState.shift = true;
-        break;
-    }
-  };
-
-  private onKeyUp = (event: KeyboardEvent) => {
-    switch (event.code) {
-      case 'KeyW':
-        this.moveState.forward = false;
-        break;
-      case 'KeyS':
-        this.moveState.backward = false;
-        break;
-      case 'KeyA':
-        this.moveState.left = false;
-        break;
-      case 'KeyD':
-        this.moveState.right = false;
-        break;
-      case 'Space':
-        this.moveState.up = false;
-        break;
-      case 'ControlLeft':
-      case 'ControlRight':
-        this.moveState.down = false;
-        break;
-      case 'ShiftLeft':
-      case 'ShiftRight':
-        this.moveState.shift = false;
-        break;
-    }
   };
 
   // New method to create connections between world objects

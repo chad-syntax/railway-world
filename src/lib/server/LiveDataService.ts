@@ -299,8 +299,7 @@ export class LiveDataService {
   private startGqlSubscriptionForLogs() {
     if (this.gqlWs) return;
 
-    if (isMockDataMode) {
-      // send mock http logs
+    if (isMockDataMode && !this.mockHttpLogsInterval) {
       this.mockHttpLogsInterval = setInterval(() => {
         this.clientConnections.forEach((conn) => {
           this.sendClientMessage(conn, {
