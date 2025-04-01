@@ -86,6 +86,9 @@ export abstract class WorldObject {
     this.name = name;
     this.id = uuidv4();
     this.position = position;
+
+    this.group.userData.isWorldObjectRootGroup = true;
+    this.group.userData.worldObject = this;
   }
 
   protected createLabel(
@@ -161,6 +164,8 @@ export abstract class WorldObject {
     sprite.scale.set(scaleX, scaleY, 1);
 
     sprite.position.set(position.x, position.y, position.z);
+
+    sprite.userData.ignoreInteraction = true;
 
     this.group.add(sprite);
   }

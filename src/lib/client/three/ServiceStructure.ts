@@ -113,8 +113,6 @@ export class ServiceStructure extends WorldObject {
     this.service = service;
     this.deployment = deployment;
 
-    this.group.userData.service = service;
-
     // Get color based on service type
     this.serviceStructureColor =
       SERVICE_STRUCTURE_TYPE_COLORS[
@@ -690,6 +688,12 @@ export class ServiceStructure extends WorldObject {
   }
 
   onInteract(): void {
-    console.log('onInteract', this.name);
+    this.world.player.controls.unlock();
+
+    const logPanel = this.service.domains.length > 0 ? 'http' : 'deploy';
+
+    const serviceUrl = `https://railway.com/project/${this.world.railwayData.projectId}/service/${this.service.id}?environmentId=${this.world.railwayData.environmentId}&id=${this.service.latestDeployment.id}#${logPanel}`;
+
+    window.open(serviceUrl, '_blank');
   }
 }

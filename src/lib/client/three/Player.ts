@@ -10,8 +10,10 @@ type PlayerConstructorOptions = {
 
 export class Player extends WorldObject {
   public camera: THREE.PerspectiveCamera;
+  public controls: PointerLockControls;
+
   private static readonly PLAYER_HEIGHT = 1.7; // Average human height in meters
-  private static readonly INTERACTION_DISTANCE = 5.0; // Maximum distance for interaction
+  private static readonly INTERACTION_DISTANCE = 10.0; // Maximum distance for interaction
 
   // Movement speeds
   private static readonly NORMAL_SPEED = 30.0;
@@ -22,7 +24,6 @@ export class Player extends WorldObject {
   private static readonly SNEAK_VERTICAL_SPEED = 5.0;
   private static readonly PLAYER_GRAVITY_MULTIPLIER = 3;
 
-  private controls: PointerLockControls;
   private velocity = new THREE.Vector3();
   private direction = new THREE.Vector3();
   private moveState = {
@@ -91,6 +92,9 @@ export class Player extends WorldObject {
 
     // Initialize interaction system
     this.raycaster = new THREE.Raycaster();
+    // Set the maximum distance for the raycaster
+    this.raycaster.far = Player.INTERACTION_DISTANCE;
+
     this.createCrosshair();
     this.createInteractionPrompt();
 
@@ -140,93 +144,142 @@ export class Player extends WorldObject {
     this.crosshair.position.add(forward.multiplyScalar(5));
   }
 
+  private updateInteractionPromptText(): void {
+    if (!this.currentInteractable) return;
+
+    const text = `E ${this.currentInteractable.name}`;
+
+    const { texture } = this.createTextTexture(text, {
+      fontSize: 48,
+      fontFamily: 'monospace',
+      color: '#ffffff',
+      strokeColor: '#000000',
+      strokeWidth: 4,
+      canvasWidth: 1024,
+      canvasHeight: 256,
+      textAlign: 'center',
+      textBaseline: 'middle',
+    });
+
+    if (this.interactionPrompt) {
+      const material = this.interactionPrompt.material;
+
+      const oldTexture = material.map;
+      material.map = texture;
+
+      if (oldTexture) {
+        oldTexture.dispose();
+      }
+    }
+  }
+
   private createInteractionPrompt(): void {
-    // Create a canvas for the text
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    canvas.width = 256;
-    canvas.height = 64;
+    const { texture } = this.createTextTexture('', {
+      fontSize: 48,
+      fontFamily: 'monospace',
+      color: '#ffffff',
+      strokeColor: '#000000',
+      strokeWidth: 4,
+      canvasWidth: 1024,
+      canvasHeight: 256,
+      textAlign: 'center',
+      textBaseline: 'middle',
+    });
 
-    // Clear the canvas with a transparent background
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Configure text settings
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 4;
-    ctx.font = 'bold 32px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Draw text with outline
-    ctx.strokeText('Press E to interact', canvas.width / 2, canvas.height / 2);
-    ctx.fillText('Press E to interact', canvas.width / 2, canvas.height / 2);
-
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-
-    // Create sprite material
+    // Create sprite material using the initial texture
     const material = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
     });
 
     // Create sprite
     this.interactionPrompt = new THREE.Sprite(material);
-    this.interactionPrompt.scale.set(2, 0.5, 1);
-    this.interactionPrompt.visible = false;
+    this.interactionPrompt.scale.set(0.5, 0.125, 1); // Keep previous scale
+    this.interactionPrompt.visible = false; // Start hidden
+    this.interactionPrompt.renderOrder = 999;
 
-    // Add to camera
-    this.camera.add(this.interactionPrompt);
+    this.group.add(this.interactionPrompt);
   }
 
   private updateInteraction(): void {
     if (!this.controls.isLocked) return;
 
-    // Update the picking ray with the camera and mouse position
-    this.raycaster.setFromCamera(new THREE.Vector2(), this.camera);
+    // Update the picking ray from the camera center
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
 
     // Find objects intersecting the ray
     const intersects = this.raycaster.intersectObjects(
       this.world.getScene().children,
-      true
+      true // check descendants
     );
 
-    console.log(intersects);
+    let foundInteractable: WorldObject | null = null;
 
-    // Find the first intersected object that has an onInteract method
-    const interactable = intersects.find((intersect) => {
-      let currentObject: THREE.Object3D | null = intersect.object;
-      while (currentObject && !(currentObject instanceof WorldObject)) {
-        currentObject = currentObject.parent;
-      }
-      return (
-        currentObject instanceof WorldObject && 'onInteract' in currentObject
-      );
-    });
+    // Find the first interactable WorldObject among intersections
+    for (const intersect of intersects) {
+      let obj: THREE.Object3D | null = intersect.object;
+      let rootGroup: THREE.Object3D | null = null;
 
-    if (interactable) {
-      let currentObject: THREE.Object3D | null = interactable.object;
-      while (currentObject && !(currentObject instanceof WorldObject)) {
-        currentObject = currentObject.parent;
+      // Traverse up the parent chain to find the root group of a WorldObject
+      while (obj) {
+        // we don't want to count labels and other non-interactable objects
+        if (obj?.userData?.ignoreInteraction) {
+          obj = null;
+          break;
+        }
+
+        if (obj.userData && obj.userData.isWorldObjectRootGroup === true) {
+          rootGroup = obj; // Found the root group
+          break;
+        }
+        obj = obj.parent; // Move up to the parent
       }
+
+      // If we found a root group, get the associated WorldObject instance
       if (
-        currentObject instanceof WorldObject &&
-        'onInteract' in currentObject
+        rootGroup &&
+        rootGroup.userData &&
+        rootGroup.userData.worldObject instanceof WorldObject
       ) {
-        this.currentInteractable = currentObject;
-        if (this.interactionPrompt) {
-          this.interactionPrompt.visible = true;
-          // Position the prompt slightly above the crosshair
-          this.interactionPrompt.position.set(0, 0.1, -0.1);
+        const worldObjectInstance = rootGroup.userData
+          .worldObject as WorldObject;
+
+        // Check if it's a valid, interactable WorldObject (and not the player itself)
+        if (
+          worldObjectInstance !== this &&
+          typeof (worldObjectInstance as any).onInteract === 'function'
+        ) {
+          foundInteractable = worldObjectInstance;
+          break; // Found the closest interactable, stop searching
         }
       }
-    } else {
-      this.currentInteractable = null;
-      if (this.interactionPrompt) {
-        this.interactionPrompt.visible = false;
+    }
+
+    const previousInteractable = this.currentInteractable;
+    this.currentInteractable = foundInteractable;
+
+    if (this.currentInteractable !== previousInteractable) {
+      this.updateInteractionPromptText();
+    }
+
+    // Update the visibility and position of the interaction prompt
+    if (this.interactionPrompt) {
+      const shouldBeVisible = Boolean(this.currentInteractable);
+
+      this.interactionPrompt.visible = shouldBeVisible;
+
+      if (shouldBeVisible) {
+        const relativeOffset = new THREE.Vector3(0, 0.05, -1);
+
+        relativeOffset.applyQuaternion(this.camera.quaternion);
+
+        this.interactionPrompt.position
+          .copy(this.camera.position)
+          .add(relativeOffset);
+
+        this.interactionPrompt.lookAt(this.camera.position);
       }
     }
   }

@@ -175,4 +175,12 @@ export class VolumeStructure extends WorldObject {
   }
 
   onUpdate(delta: number): void {}
+
+  onInteract(): void {
+    this.world.unlockControls();
+
+    const volumeUrl = `https://railway.com/project/${this.world.railwayData.projectId}/volume/${this.volume.id}/metrics?environmentId=${this.world.railwayData.environmentId}`;
+
+    window.open(volumeUrl, '_blank');
+  }
 }

@@ -42,11 +42,10 @@ export class World {
   public requestBlocks: Map<string, RequestBlock> = new Map();
   public populated: boolean = false;
   public renderer: THREE.WebGLRenderer;
+  public player: Player;
 
-  private player: Player;
   private scene: THREE.Scene;
   private htmlRoot: HTMLElement;
-
   private ambientLight: THREE.AmbientLight;
   private directionalLight: THREE.DirectionalLight;
   private ground: THREE.Mesh;
@@ -580,5 +579,9 @@ export class World {
   // Add getter for scene
   public getScene(): THREE.Scene {
     return this.scene;
+  }
+
+  public unlockControls() {
+    this.player.controls.unlock();
   }
 }

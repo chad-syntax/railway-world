@@ -73,6 +73,8 @@ export interface RailwayData {
   updatedAt: string;
   services: Service[];
   team: Team;
+  projectId: string;
+  environmentId: string;
 }
 
 export type WebSocketEventName = 'ping' | 'pong' | 'logs' | 'latestDeployments';

@@ -53,6 +53,7 @@ query RailwayData($id: String!) {
             edges {
               node {
                 id
+                volumeId
                 type
                 mountPath
                 currentSizeMB
@@ -88,9 +89,11 @@ query RailwayData($id: String!) {
 export function processRailwayData(rawData: any): RailwayData {
   const processedData: RailwayData = {
     projectName: rawData.data?.project?.name || '',
+    projectId: process.env.RAILWAY_WORLD_PROJECT_ID || '',
     updatedAt: rawData.data?.project?.updatedAt || '',
     team: rawData.data?.project?.team || { name: '', avatar: '' },
     services: [],
+    environmentId: '',
   };
 
   // Get the production environment (or first environment if no production found)
@@ -104,6 +107,8 @@ export function processRailwayData(rawData: any): RailwayData {
   }
 
   const environment = productionEnvEdge.node;
+
+  processedData.environmentId = environment.id;
 
   // Create a map of service IDs to icons
   const serviceIconMap = new Map<string, string>();
@@ -163,7 +168,7 @@ export function processRailwayData(rawData: any): RailwayData {
 
     if (service) {
       service.volume = {
-        id: volume.id,
+        id: volume.volumeId,
         name: volume.volume.name,
         currentSizeMB: volume.currentSizeMB,
         sizeMB: volume.sizeMB,

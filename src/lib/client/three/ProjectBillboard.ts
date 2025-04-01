@@ -176,4 +176,13 @@ export class ProjectBillboard extends Billboard {
   }
 
   onUpdate(delta: number): void {}
+
+  onInteract(): void {
+    this.world.unlockControls();
+
+    const projectUrl = `https://railway.com/project/${this.world.railwayData.projectId}`;
+
+    // open a link to the project
+    window.open(projectUrl, '_blank');
+  }
 }

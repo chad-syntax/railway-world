@@ -92,4 +92,12 @@ export class AuthorBillboard extends Billboard {
   }
 
   onUpdate(delta: number): void {}
+
+  onInteract(): void {
+    this.world.unlockControls();
+
+    const authorUrl = 'https://github.com/chad-syntax/railway-world';
+
+    window.open(authorUrl, '_blank');
+  }
 }
