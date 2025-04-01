@@ -4,9 +4,9 @@ import { Position } from './WorldObject';
 import * as THREE from 'three';
 import { Team } from '../../types';
 import {
-  UI_DARK_BLUE_GRAY_HEX,
-  UI_WHITE_HEX,
-  UI_LIGHT_GRAY_HEX,
+  GRAY_4_HEX_STR,
+  WHITE_HEX_STR,
+  GRAY_1_HEX_STR,
 } from '../../../lib/colors';
 
 type ProjectBillboardConstructorOptions = {
@@ -74,7 +74,7 @@ export class ProjectBillboard extends Billboard {
       canvas.height = 1024;
 
       // Fill background (matching the panel color but slightly lighter)
-      ctx.fillStyle = UI_DARK_BLUE_GRAY_HEX;
+      ctx.fillStyle = GRAY_4_HEX_STR;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Load Railway icon
@@ -91,7 +91,7 @@ export class ProjectBillboard extends Billboard {
 
       // Configure text settings
       ctx.textAlign = 'left';
-      ctx.fillStyle = UI_WHITE_HEX;
+      ctx.fillStyle = WHITE_HEX_STR;
 
       // Draw project name
       ctx.font = '112px monospace';
@@ -99,12 +99,12 @@ export class ProjectBillboard extends Billboard {
 
       // draw team label
       ctx.font = '80px monospace';
-      ctx.fillStyle = UI_LIGHT_GRAY_HEX;
+      ctx.fillStyle = GRAY_1_HEX_STR;
       ctx.fillText('Team', canvas.width * 0.23, canvas.height * 0.48);
 
       // draw team name
       ctx.font = '80px monospace';
-      ctx.fillStyle = UI_WHITE_HEX;
+      ctx.fillStyle = WHITE_HEX_STR;
       ctx.fillText(this.team.name, canvas.width * 0.23, canvas.height * 0.58);
 
       // draw team avatar
@@ -122,7 +122,7 @@ export class ProjectBillboard extends Billboard {
       ctx.closePath();
 
       // Add a white border around the circle
-      ctx.strokeStyle = UI_WHITE_HEX;
+      ctx.strokeStyle = WHITE_HEX_STR;
       ctx.lineWidth = 4;
       ctx.stroke();
 
@@ -146,7 +146,7 @@ export class ProjectBillboard extends Billboard {
       })}`;
 
       ctx.font = '36px monospace';
-      ctx.fillStyle = UI_LIGHT_GRAY_HEX;
+      ctx.fillStyle = GRAY_1_HEX_STR;
       ctx.fillText(updatedAtText, canvas.width * 0.23, canvas.height * 0.85);
 
       // Create texture from canvas

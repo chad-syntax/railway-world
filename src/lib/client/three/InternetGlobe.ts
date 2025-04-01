@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ServiceStructure } from './ServiceStructure';
 import { World } from './World';
 import { WorldObject, Position } from './WorldObject';
-import { CONNECTION_BLUE, UI_WHITE, COLOR_BLUE_HEX } from '../../../lib/colors';
+import { BLUE, WHITE, DARK_BLUE_HEX_STR } from '../../../lib/colors';
 
 type InternetGlobeConstructorOptions = {
   name: string;
@@ -58,9 +58,9 @@ export class InternetGlobe extends WorldObject {
 
     // Create a material with wireframe to look like the "World Wide Web" icon
     const material = new THREE.MeshStandardMaterial({
-      color: CONNECTION_BLUE, // Blue color
+      color: BLUE, // Blue color
       wireframe: true, // Make it a wireframe
-      emissive: CONNECTION_BLUE, // Add a slight glow
+      emissive: BLUE, // Add a slight glow
       emissiveIntensity: 0.8,
       transparent: true,
       opacity: 0.8,
@@ -74,7 +74,7 @@ export class InternetGlobe extends WorldObject {
     );
 
     const innerMaterial = new THREE.MeshStandardMaterial({
-      color: UI_WHITE,
+      color: WHITE,
       transparent: true,
       opacity: 0.8,
     });
@@ -105,7 +105,7 @@ export class InternetGlobe extends WorldObject {
       canvasWidth: 2048,
       canvasHeight: 128,
       strokeWidth: 0,
-      backgroundColor: COLOR_BLUE_HEX,
+      backgroundColor: DARK_BLUE_HEX_STR,
     });
 
     // Create material with the texture

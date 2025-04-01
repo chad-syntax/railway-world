@@ -1,5 +1,6 @@
 import { gqlRequest } from './request';
 import { DeploymentStatus } from '../../types';
+
 const latestDeploymentsQuery = `
 query LatestDeployments($id: String!) {
   project(id: $id) {

@@ -13,12 +13,13 @@ import {
   SERVICE_POSTGRES,
   SERVICE_REDIS,
   SERVICE_POSTIZ,
-  SERVICE_DEFAULT,
-  STATUS_SUCCESS_ALT_HEX,
-  STATUS_SLEEPING_HEX,
-  STATUS_FAILED_HEX,
-  STATUS_DEFAULT_HEX,
-  UI_WHITE_HEX,
+  GRAY_3,
+  LIME_GREEN_HEX_STR,
+  BLUE_HEX_STR,
+  RED_HEX_STR,
+  GRAY_1_HEX_STR,
+  WHITE_HEX_STR,
+  BLACK_HEX_STR,
 } from '../../../lib/colors';
 
 const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
@@ -27,7 +28,7 @@ const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
   postgresql: SERVICE_POSTGRES,
   redis: SERVICE_REDIS,
   postiz: SERVICE_POSTIZ,
-  default: SERVICE_DEFAULT,
+  default: GRAY_3,
 } as const;
 
 type ServiceStructureTypeColors = keyof typeof SERVICE_STRUCTURE_TYPE_COLORS;
@@ -91,7 +92,7 @@ export class ServiceStructure extends WorldObject {
   private readonly Z_GROW_SPEED = 0.5; // Scale increase per second
   private readonly Z_MAX_SCALE = 3; // Maximum scale before Z disappears
   private readonly Z_START_SCALE = 0; // Initial scale of Z
-  private readonly Z_COLOR = STATUS_SLEEPING_HEX; // Use the sleeping status color
+  private readonly Z_COLOR = BLUE_HEX_STR; // Use the BLUE status color
   private isFireAnimating: boolean = false;
   private fireMeshes: THREE.Mesh[] = [];
   private fireTexture: THREE.Texture | null = null;
@@ -117,7 +118,7 @@ export class ServiceStructure extends WorldObject {
         this.service.name.toLowerCase() as ServiceStructureTypeColors
       ] || SERVICE_STRUCTURE_TYPE_COLORS.default;
 
-    this.nameColor = UI_WHITE_HEX;
+    this.nameColor = WHITE_HEX_STR;
 
     // Create serviceStructure geometry
     const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
@@ -212,17 +213,17 @@ export class ServiceStructure extends WorldObject {
     let textColor;
     switch (deploymentStatus) {
       case 'SUCCESS':
-        textColor = STATUS_SUCCESS_ALT_HEX; // Green
+        textColor = LIME_GREEN_HEX_STR; // Green
         break;
       case 'SLEEPING':
-        textColor = STATUS_SLEEPING_HEX; // Yellow
+        textColor = BLUE_HEX_STR; // Blue (was sleeping/yellow)
         break;
       case 'FAILED':
       case 'CRASHED':
-        textColor = STATUS_FAILED_HEX; // Red
+        textColor = RED_HEX_STR; // Red
         break;
       default:
-        textColor = STATUS_DEFAULT_HEX; // Blue
+        textColor = GRAY_1_HEX_STR; // Gray (was default/blue)
     }
 
     // TODO clean this up
@@ -263,6 +264,7 @@ export class ServiceStructure extends WorldObject {
         canvasWidth: 1024,
         canvasHeight: 256,
         strokeWidth: 12,
+        strokeColor: BLACK_HEX_STR,
       }
     );
 
@@ -359,7 +361,7 @@ export class ServiceStructure extends WorldObject {
       canvasWidth: 128,
       canvasHeight: 128,
       color: this.Z_COLOR,
-      strokeColor: UI_WHITE_HEX,
+      strokeColor: WHITE_HEX_STR,
       strokeWidth: 4,
     });
 

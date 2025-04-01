@@ -1,72 +1,64 @@
-// World colors
-export const WORLD_SKY_BLUE = 0x87ceeb;
-export const WORLD_SKY_BLUE_HEX = '#87ceeb';
-export const WORLD_LIGHT_GRAY = 0x909090;
-export const WORLD_LIGHT_GRAY_HEX = '#909090';
-export const WORLD_GRASS_GREEN = 0x4caf50;
-export const WORLD_GRASS_GREEN_HEX = '#4caf50';
-export const WORLD_ORANGE = 0xffaa00;
-export const WORLD_ORANGE_HEX = '#ffaa00';
+const hexStr = (color: number): string =>
+  '#' + (color >>> 0).toString(16).padStart(6, '0');
 
-// UI colors
-export const UI_WHITE = 0xffffff;
-export const UI_WHITE_HEX = '#ffffff';
-export const UI_DARK_BLUE_GRAY = 0x2f3437;
-export const UI_DARK_BLUE_GRAY_HEX = '#2f3437';
-export const UI_LIGHT_GRAY = 0xc3c3c3;
-export const UI_LIGHT_GRAY_HEX = '#c3c3c3';
+export const WHITE = 0xffffff;
+export const WHITE_HEX_STR = hexStr(WHITE);
 
-// Connection colors
-export const CONNECTION_BLUE = 0x3498db;
-export const CONNECTION_BLUE_HEX = '#3498db';
+export const BLACK = 0x000000;
+export const BLACK_HEX_STR = hexStr(BLACK);
 
-// Service colors
-export const SERVICE_NODEJS = 0x68a063;
-export const SERVICE_NODEJS_HEX = '#68a063';
-export const SERVICE_POSTGRES = 0x336791;
-export const SERVICE_POSTGRES_HEX = '#336791';
-export const SERVICE_REDIS = 0xd82c20;
-export const SERVICE_REDIS_HEX = '#d82c20';
-export const SERVICE_POSTIZ = 0x612ad5;
-export const SERVICE_POSTIZ_HEX = '#612ad5';
-export const SERVICE_DEFAULT = 0x808080;
-export const SERVICE_DEFAULT_HEX = '#808080';
+export const RED = 0xff0000;
+export const RED_HEX_STR = hexStr(RED);
+
+export const ORANGE = 0xff9800;
+export const ORANGE_HEX_STR = hexStr(ORANGE);
+
+export const YELLOW = 0xffff00;
+export const YELLOW_HEX_STR = hexStr(YELLOW);
+
+export const LIME_GREEN = 0x00ff00;
+export const LIME_GREEN_HEX_STR = hexStr(LIME_GREEN);
+
+export const GREEN = 0x4caf50;
+export const GREEN_HEX_STR = hexStr(GREEN);
+
+export const SKY_BLUE = 0x87ceeb;
+export const SKY_BLUE_HEX_STR = hexStr(SKY_BLUE);
 
 export const LIGHT_STEEL_BLUE = 0xb0c4de;
-export const LIGHT_STEEL_BLUE_HEX = '#b0c4de';
+export const LIGHT_STEEL_BLUE_HEX_STR = hexStr(LIGHT_STEEL_BLUE);
 
-// Status colors
-export const STATUS_SUCCESS = 0x4caf50;
-export const STATUS_SUCCESS_HEX = '#4caf50';
-export const STATUS_SUCCESS_ALT = 0x00ff00;
-export const STATUS_SUCCESS_ALT_HEX = '#00ff00';
-export const STATUS_WARNING = 0xff9800;
-export const STATUS_WARNING_HEX = '#ff9800';
-export const STATUS_ERROR = 0xf44336;
-export const STATUS_ERROR_HEX = '#f44336';
-export const STATUS_ERROR_LIGHT = 0xff6b6b;
-export const STATUS_ERROR_LIGHT_HEX = '#ff6b6b';
-export const STATUS_NEUTRAL = 0x808080;
-export const STATUS_NEUTRAL_HEX = '#808080';
-export const STATUS_SLEEPING = 0x4169e1;
-export const STATUS_SLEEPING_HEX = '#4169e1';
-export const STATUS_FAILED = 0xff0000;
-export const STATUS_FAILED_HEX = '#ff0000';
-export const STATUS_DEFAULT = 0xc3c3c3;
-export const STATUS_DEFAULT_HEX = '#c3c3c3';
+export const BLUE = 0x3498db;
+export const BLUE_HEX_STR = hexStr(BLUE);
 
-// Volume colors
-export const VOLUME_LIGHT_GRAY = 0xc3c3c3;
-export const VOLUME_LIGHT_GRAY_HEX = '#c3c3c3';
-export const VOLUME_RED = 0xff0000;
-export const VOLUME_RED_HEX = '#ff0000';
-export const VOLUME_YELLOW = 0xffff00;
-export const VOLUME_YELLOW_HEX = '#ffff00';
-export const VOLUME_GREEN = 0x00ff00;
-export const VOLUME_GREEN_HEX = '#00ff00';
-export const VOLUME_BLACK = 0x000000;
-export const VOLUME_BLACK_HEX = '#000000';
+export const DARK_BLUE = 0x00008b;
+export const DARK_BLUE_HEX_STR = hexStr(DARK_BLUE);
 
-// Colors
-export const COLOR_BLUE = 0x00008b;
-export const COLOR_BLUE_HEX = '#00008b';
+export const PURPLE = 0x612ad5;
+export const PURPLE_HEX_STR = hexStr(PURPLE);
+
+// Grays ordered light to dark
+export const GRAY_1 = 0xc3c3c3;
+export const GRAY_1_HEX_STR = hexStr(GRAY_1);
+
+export const GRAY_2 = 0x909090;
+export const GRAY_2_HEX_STR = hexStr(GRAY_2);
+
+export const GRAY_3 = 0x808080;
+export const GRAY_3_HEX_STR = hexStr(GRAY_3);
+
+export const GRAY_4 = 0x2f3437;
+export const GRAY_4_HEX_STR = hexStr(GRAY_4);
+
+// Service Specific Colors
+export const SERVICE_NODEJS = 0x68a063;
+export const SERVICE_NODEJS_HEX_STR = hexStr(SERVICE_NODEJS);
+
+export const SERVICE_POSTGRES = 0x336791;
+export const SERVICE_POSTGRES_HEX_STR = hexStr(SERVICE_POSTGRES);
+
+export const SERVICE_REDIS = 0xd82c20;
+export const SERVICE_REDIS_HEX_STR = hexStr(SERVICE_REDIS);
+
+export const SERVICE_POSTIZ = PURPLE;
+export const SERVICE_POSTIZ_HEX_STR = hexStr(SERVICE_POSTIZ);

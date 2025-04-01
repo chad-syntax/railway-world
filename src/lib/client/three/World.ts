@@ -16,13 +16,12 @@ import { HttpLog } from '../../types';
 import { WebSocketClient } from '../websocket';
 import { RequestBlock } from './RequestBlock';
 import {
-  WORLD_SKY_BLUE,
-  WORLD_LIGHT_GRAY,
-  UI_WHITE,
-  WORLD_GRASS_GREEN,
-  WORLD_ORANGE,
-  CONNECTION_BLUE,
-  VOLUME_YELLOW,
+  SKY_BLUE,
+  GRAY_2,
+  WHITE,
+  GREEN,
+  BLUE,
+  YELLOW,
 } from '../../../lib/colors';
 import { Player } from './Player';
 
@@ -59,7 +58,7 @@ export class World {
     this.wsClient = wsClient;
     this.railwayData = railwayData;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(WORLD_SKY_BLUE);
+    this.scene.background = new THREE.Color(SKY_BLUE);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -69,10 +68,10 @@ export class World {
     this.htmlRoot.appendChild(this.renderer.domElement);
 
     // Add basic lighting
-    this.ambientLight = new THREE.AmbientLight(WORLD_LIGHT_GRAY, 1.2);
+    this.ambientLight = new THREE.AmbientLight(GRAY_2, 1.2);
     this.scene.add(this.ambientLight);
 
-    this.directionalLight = new THREE.DirectionalLight(UI_WHITE, 1.2);
+    this.directionalLight = new THREE.DirectionalLight(WHITE, 1.2);
     this.directionalLight.position.set(1, 10, 1);
     this.directionalLight.castShadow = true;
     this.directionalLight.shadow.mapSize.width = 1024;
@@ -85,7 +84,7 @@ export class World {
     this.ground = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
       new THREE.MeshStandardMaterial({
-        color: WORLD_GRASS_GREEN, // Grass green color
+        color: GREEN, // Grass green color
         side: THREE.DoubleSide,
       })
     );
@@ -336,7 +335,7 @@ export class World {
         this.addObject(volumeStructure);
         // Create a connection between the service and volume
         this.createConnectionBetween(serviceStructure, volumeStructure, {
-          color: WORLD_ORANGE, // Orange for service-to-volume connections
+          color: YELLOW, // Yellow for service-to-volume connections
         });
       }
 
@@ -377,7 +376,7 @@ export class World {
           // Create a connection if the target serviceStructure exists
           if (startPointObject && endPointObject) {
             this.createConnectionBetween(startPointObject, endPointObject, {
-              color: VOLUME_YELLOW, // Green for service-to-service connections
+              color: BLUE, // Blue for service-to-service connections
             });
           }
         }
@@ -547,7 +546,7 @@ export class World {
       startPoint,
       endPoint,
       lineRadius,
-      color: options.color || CONNECTION_BLUE,
+      color: options.color || BLUE,
     });
 
     // Add the connection to the world's objects
@@ -567,7 +566,7 @@ export class World {
   ): ConnectionLine {
     return this.createConnectionBetween(serviceStructureA, serviceStructureB, {
       lineRadius: options.lineRadius || 0.02,
-      color: options.color || WORLD_GRASS_GREEN, // Default green for serviceStructure connections
+      color: options.color || GREEN, // Default green for serviceStructure connections
     });
   }
 

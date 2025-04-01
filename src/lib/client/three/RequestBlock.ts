@@ -11,17 +11,26 @@ import {
 import { Position, WorldObject } from './WorldObject';
 import { World } from './World';
 import {
-  STATUS_SUCCESS,
-  STATUS_WARNING,
-  STATUS_ERROR_LIGHT,
-  STATUS_ERROR,
-  STATUS_NEUTRAL,
-  UI_WHITE_HEX,
-  STATUS_SUCCESS_HEX,
-  STATUS_WARNING_HEX,
-  STATUS_ERROR_HEX,
-  STATUS_ERROR_LIGHT_HEX,
-  STATUS_NEUTRAL_HEX,
+  // STATUS_SUCCESS,
+  // STATUS_WARNING,
+  // STATUS_ERROR_LIGHT,
+  // STATUS_ERROR,
+  // STATUS_NEUTRAL,
+  // UI_WHITE_HEX,
+  // STATUS_SUCCESS_HEX,
+  // STATUS_WARNING_HEX,
+  // STATUS_ERROR_HEX,
+  // STATUS_ERROR_LIGHT_HEX,
+  // STATUS_NEUTRAL_HEX,
+  GREEN,
+  ORANGE,
+  RED,
+  GRAY_3,
+  WHITE_HEX_STR,
+  GREEN_HEX_STR,
+  ORANGE_HEX_STR,
+  RED_HEX_STR,
+  GRAY_3_HEX_STR,
 } from '../../../lib/colors';
 
 type RequestBlockOptions = {
@@ -154,20 +163,20 @@ export class RequestBlock extends WorldObject {
     let baseColorHex;
 
     if (status >= 200 && status < 300) {
-      baseColor = STATUS_SUCCESS; // Green for 2xx (success)
-      baseColorHex = STATUS_SUCCESS_HEX;
+      baseColor = GREEN; // Green for 2xx (success)
+      baseColorHex = GREEN_HEX_STR;
     } else if (status >= 300 && status < 400) {
-      baseColor = STATUS_WARNING; // Orange for 3xx (redirection)
-      baseColorHex = STATUS_WARNING_HEX;
+      baseColor = ORANGE; // Orange for 3xx (redirection)
+      baseColorHex = ORANGE_HEX_STR;
     } else if (status >= 400 && status < 500) {
-      baseColor = STATUS_ERROR_LIGHT; // Light red for 4xx (client errors)
-      baseColorHex = STATUS_ERROR_LIGHT_HEX;
+      baseColor = RED; // Red for 4xx (client errors) - Consolidated
+      baseColorHex = RED_HEX_STR;
     } else if (status >= 500) {
-      baseColor = STATUS_ERROR; // Dark red for 5xx (server errors)
-      baseColorHex = STATUS_ERROR_HEX;
+      baseColor = RED; // Red for 5xx (server errors) - Consolidated
+      baseColorHex = RED_HEX_STR;
     } else {
-      baseColor = STATUS_NEUTRAL; // Gray for unknown status codes
-      baseColorHex = STATUS_NEUTRAL_HEX;
+      baseColor = GRAY_3; // Gray for unknown status codes
+      baseColorHex = GRAY_3_HEX_STR;
     }
 
     // Create the main cube with solid color

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { WorldObject } from './WorldObject';
 import { World } from './World';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
-import { UI_WHITE } from '../../colors';
+import { WHITE_HEX_STR } from '../../colors';
 
 const $interactionPrompt = document.getElementById('interaction-prompt')!;
 
@@ -116,7 +116,7 @@ export class Player extends WorldObject {
     const horizontalGeometry = new THREE.PlaneGeometry(size * 2, thickness);
 
     const material = new THREE.MeshBasicMaterial({
-      color: UI_WHITE,
+      color: WHITE_HEX_STR,
       depthTest: false, // Don't test against depth buffer
       depthWrite: false, // Don't write to depth buffer
       transparent: true, // Make it transparent
@@ -147,78 +147,6 @@ export class Player extends WorldObject {
     this.crosshair.position.copy(this.camera.position);
     this.crosshair.position.add(forward.multiplyScalar(5));
   }
-
-  // private updateInteractionPromptText(): void {
-  //   if (!this.currentInteractable) return;
-
-  //   let text = this.currentInteractable.name;
-
-  //   if (
-  //     (this.currentInteractable as any).getInteractionText &&
-  //     typeof (this.currentInteractable as any).getInteractionText === 'function'
-  //   ) {
-  //     text = (this.currentInteractable as any).getInteractionText();
-  //   }
-
-  //   // const { texture } = this.createTextTexture(text, {
-  //   //   fontSize: 48,
-  //   //   fontFamily: 'monospace',
-  //   //   color: '#ffffff',
-  //   //   strokeColor: '#000000',
-  //   //   strokeWidth: 4,
-  //   //   canvasWidth: 1024,
-  //   //   canvasHeight: 256,
-  //   //   textAlign: 'center',
-  //   //   textBaseline: 'middle',
-  //   // });
-
-  //   if (this.interactionPrompt) {
-  //     const material = this.interactionPrompt.material;
-
-  //     const oldTexture = material.map;
-  //     material.map = texture;
-
-  //     if (oldTexture) {
-  //       oldTexture.dispose();
-  //     }
-  //   }
-  // }
-
-  // private createInteractionPrompt(): void {
-  //   // const { texture } = this.createTextTexture('', {
-  //   //   fontSize: 48,
-  //   //   fontFamily: 'monospace',
-  //   //   color: '#ffffff',
-  //   //   strokeColor: '#000000',
-  //   //   strokeWidth: 4,
-  //   //   canvasWidth: 1024,
-  //   //   canvasHeight: 256,
-  //   //   textAlign: 'center',
-  //   //   textBaseline: 'middle',
-  //   // });
-
-  //   const canvas = document.createElement('canvas');
-  //   canvas.width = 1024;
-  //   canvas.height = 256;
-
-  //   const ctx = canvas.getContext('2d')!;
-
-  //   // Create sprite material using the initial texture
-  //   const material = new THREE.SpriteMaterial({
-  //     map: texture,
-  //     transparent: true,
-  //     depthWrite: false,
-  //     depthTest: false,
-  //   });
-
-  //   // Create sprite
-  //   this.interactionPrompt = new THREE.Sprite(material);
-  //   this.interactionPrompt.scale.set(0.5, 0.125, 1); // Keep previous scale
-  //   this.interactionPrompt.visible = false; // Start hidden
-  //   this.interactionPrompt.renderOrder = 999;
-
-  //   this.group.add(this.interactionPrompt);
-  // }
 
   private updateInteractionPromptText(): void {
     if (!this.currentInteractable) return;

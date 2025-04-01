@@ -2,14 +2,7 @@ import * as THREE from 'three';
 import { Volume } from '../../types';
 import { World } from './World';
 import { WorldObject, Position } from './WorldObject';
-import {
-  VOLUME_LIGHT_GRAY,
-  VOLUME_RED,
-  VOLUME_YELLOW,
-  VOLUME_GREEN,
-  VOLUME_BLACK,
-  UI_WHITE_HEX,
-} from '../../../lib/colors';
+import { GRAY_1, RED, YELLOW, LIME_GREEN, BLACK } from '../../../lib/colors';
 
 type VolumeStructureOptions = {
   name: string;
@@ -20,7 +13,7 @@ type VolumeStructureOptions = {
 
 export class VolumeStructure extends WorldObject {
   public volume: Volume;
-  private color: number = VOLUME_LIGHT_GRAY;
+  private color: number = GRAY_1;
   private usage: number = 0;
   private width: number = 1;
   private height: number = 1;
@@ -37,11 +30,7 @@ export class VolumeStructure extends WorldObject {
 
     this.usage = this.volume.currentSizeMB / this.volume.sizeMB;
     this.color =
-      this.usage > 0.8
-        ? VOLUME_RED
-        : this.usage > 0.5
-        ? VOLUME_YELLOW
-        : VOLUME_GREEN;
+      this.usage > 0.8 ? RED : this.usage > 0.5 ? YELLOW : LIME_GREEN;
 
     this.createVolume();
     this.addVolumeIcon();
@@ -64,7 +53,7 @@ export class VolumeStructure extends WorldObject {
     // Create wireframe cube
     const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
     const wireframeMaterial = new THREE.MeshStandardMaterial({
-      color: VOLUME_BLACK,
+      color: BLACK,
       wireframe: true,
       wireframeLinewidth: 2,
       transparent: true,
