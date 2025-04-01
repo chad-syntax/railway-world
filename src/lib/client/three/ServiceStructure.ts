@@ -132,6 +132,7 @@ export class ServiceStructure extends WorldObject {
     this.serviceStructure.position.set(0, this.height / 2, 0);
     this.serviceStructure.castShadow = true;
     this.serviceStructure.receiveShadow = true;
+    this.serviceStructure.renderOrder = 0; // Base render order
 
     this.createLabel(this.name, {
       x: 0,
@@ -187,6 +188,7 @@ export class ServiceStructure extends WorldObject {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(0, this.height + 0.01, 0);
+    mesh.renderOrder = 1; // Draw after base cube
     this.group.add(mesh);
   }
 
@@ -278,9 +280,8 @@ export class ServiceStructure extends WorldObject {
 
     // Create mesh with the material
     this.statusMesh = new THREE.Mesh(statusGeometry, material);
-
-    // Position at the top of the front face
     this.statusMesh.position.set(0, this.height - 0.25, this.depth / 2 + 0.001);
+    this.statusMesh.renderOrder = 1; // Draw after base cube
 
     // Add to the group
     this.group.add(this.statusMesh);
@@ -318,9 +319,8 @@ export class ServiceStructure extends WorldObject {
 
         // Create the mesh and store a reference to it
         this.iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-
-        // Position the icon on the front face (z+)
         this.iconMesh.position.set(0, this.height / 2, this.depth / 2 + 0.01);
+        this.iconMesh.renderOrder = 1; // Draw after base cube
 
         // Add to group
         this.group.add(this.iconMesh);
@@ -346,9 +346,8 @@ export class ServiceStructure extends WorldObject {
 
     // Create the fallback mesh and store a reference to it
     this.iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-
-    // Position the icon on the front face (z+)
     this.iconMesh.position.set(0, this.height / 2, this.depth / 2 + 0.01);
+    this.iconMesh.renderOrder = 1; // Draw after base cube
 
     // Add to group
     this.group.add(this.iconMesh);
@@ -369,7 +368,7 @@ export class ServiceStructure extends WorldObject {
       map: texture,
       transparent: true,
       side: THREE.DoubleSide,
-      depthWrite: false, // Ensure proper transparency rendering
+      depthWrite: false,
     });
 
     // Create a plane for the Z
@@ -441,6 +440,7 @@ export class ServiceStructure extends WorldObject {
 
     // Rotate to face right
     this.sourceTextMesh.rotation.y = Math.PI / 2;
+    this.sourceTextMesh.renderOrder = 1; // Draw after base cube
 
     // Add to the group
     this.group.add(this.sourceTextMesh);
@@ -468,15 +468,13 @@ export class ServiceStructure extends WorldObject {
 
         // Create the mesh and store a reference to it
         this.sourceIconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-
-        // Position the icon on the right side (x+)
         this.sourceIconMesh.position.set(
           this.width / 2 + 0.01,
           this.height / 2,
           0
         );
-        // Rotate to face right
         this.sourceIconMesh.rotation.y = -Math.PI / 2;
+        this.sourceIconMesh.renderOrder = 1; // Draw after base cube
 
         // Add to group
         this.group.add(this.sourceIconMesh);
@@ -600,7 +598,6 @@ export class ServiceStructure extends WorldObject {
             map: texture,
             transparent: true,
             side: THREE.DoubleSide,
-            depthWrite: false,
             alphaTest: 0.1,
           });
 
