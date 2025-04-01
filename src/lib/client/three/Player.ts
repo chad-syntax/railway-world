@@ -4,6 +4,12 @@ import { World } from './World';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 import { UI_WHITE } from '../../colors';
 
+const $interactionPrompt = document.getElementById('interaction-prompt')!;
+
+const $interactionPromptText = document.getElementById(
+  'interaction-prompt-text'
+)!;
+
 type PlayerConstructorOptions = {
   world: World;
 };
@@ -47,7 +53,6 @@ export class Player extends WorldObject {
   private raycaster: THREE.Raycaster;
   private crosshair!: THREE.Group;
   private currentInteractable: WorldObject | null = null;
-  private interactionPrompt: THREE.Sprite | null = null;
 
   constructor(options: PlayerConstructorOptions) {
     const { world } = options;
@@ -96,7 +101,6 @@ export class Player extends WorldObject {
     this.raycaster.far = Player.INTERACTION_DISTANCE;
 
     this.createCrosshair();
-    this.createInteractionPrompt();
 
     // Extend controls to add update method
     this.controls.update = this.updateControls;
@@ -144,63 +148,91 @@ export class Player extends WorldObject {
     this.crosshair.position.add(forward.multiplyScalar(5));
   }
 
+  // private updateInteractionPromptText(): void {
+  //   if (!this.currentInteractable) return;
+
+  //   let text = this.currentInteractable.name;
+
+  //   if (
+  //     (this.currentInteractable as any).getInteractionText &&
+  //     typeof (this.currentInteractable as any).getInteractionText === 'function'
+  //   ) {
+  //     text = (this.currentInteractable as any).getInteractionText();
+  //   }
+
+  //   // const { texture } = this.createTextTexture(text, {
+  //   //   fontSize: 48,
+  //   //   fontFamily: 'monospace',
+  //   //   color: '#ffffff',
+  //   //   strokeColor: '#000000',
+  //   //   strokeWidth: 4,
+  //   //   canvasWidth: 1024,
+  //   //   canvasHeight: 256,
+  //   //   textAlign: 'center',
+  //   //   textBaseline: 'middle',
+  //   // });
+
+  //   if (this.interactionPrompt) {
+  //     const material = this.interactionPrompt.material;
+
+  //     const oldTexture = material.map;
+  //     material.map = texture;
+
+  //     if (oldTexture) {
+  //       oldTexture.dispose();
+  //     }
+  //   }
+  // }
+
+  // private createInteractionPrompt(): void {
+  //   // const { texture } = this.createTextTexture('', {
+  //   //   fontSize: 48,
+  //   //   fontFamily: 'monospace',
+  //   //   color: '#ffffff',
+  //   //   strokeColor: '#000000',
+  //   //   strokeWidth: 4,
+  //   //   canvasWidth: 1024,
+  //   //   canvasHeight: 256,
+  //   //   textAlign: 'center',
+  //   //   textBaseline: 'middle',
+  //   // });
+
+  //   const canvas = document.createElement('canvas');
+  //   canvas.width = 1024;
+  //   canvas.height = 256;
+
+  //   const ctx = canvas.getContext('2d')!;
+
+  //   // Create sprite material using the initial texture
+  //   const material = new THREE.SpriteMaterial({
+  //     map: texture,
+  //     transparent: true,
+  //     depthWrite: false,
+  //     depthTest: false,
+  //   });
+
+  //   // Create sprite
+  //   this.interactionPrompt = new THREE.Sprite(material);
+  //   this.interactionPrompt.scale.set(0.5, 0.125, 1); // Keep previous scale
+  //   this.interactionPrompt.visible = false; // Start hidden
+  //   this.interactionPrompt.renderOrder = 999;
+
+  //   this.group.add(this.interactionPrompt);
+  // }
+
   private updateInteractionPromptText(): void {
     if (!this.currentInteractable) return;
 
-    const text = `E ${this.currentInteractable.name}`;
+    let text = this.currentInteractable.name;
 
-    const { texture } = this.createTextTexture(text, {
-      fontSize: 48,
-      fontFamily: 'monospace',
-      color: '#ffffff',
-      strokeColor: '#000000',
-      strokeWidth: 4,
-      canvasWidth: 1024,
-      canvasHeight: 256,
-      textAlign: 'center',
-      textBaseline: 'middle',
-    });
-
-    if (this.interactionPrompt) {
-      const material = this.interactionPrompt.material;
-
-      const oldTexture = material.map;
-      material.map = texture;
-
-      if (oldTexture) {
-        oldTexture.dispose();
-      }
+    if (
+      (this.currentInteractable as any).getInteractionText &&
+      typeof (this.currentInteractable as any).getInteractionText === 'function'
+    ) {
+      text = (this.currentInteractable as any).getInteractionText();
     }
-  }
 
-  private createInteractionPrompt(): void {
-    const { texture } = this.createTextTexture('', {
-      fontSize: 48,
-      fontFamily: 'monospace',
-      color: '#ffffff',
-      strokeColor: '#000000',
-      strokeWidth: 4,
-      canvasWidth: 1024,
-      canvasHeight: 256,
-      textAlign: 'center',
-      textBaseline: 'middle',
-    });
-
-    // Create sprite material using the initial texture
-    const material = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthWrite: false,
-      depthTest: false,
-    });
-
-    // Create sprite
-    this.interactionPrompt = new THREE.Sprite(material);
-    this.interactionPrompt.scale.set(0.5, 0.125, 1); // Keep previous scale
-    this.interactionPrompt.visible = false; // Start hidden
-    this.interactionPrompt.renderOrder = 999;
-
-    this.group.add(this.interactionPrompt);
+    $interactionPromptText.textContent = text;
   }
 
   private updateInteraction(): void {
@@ -264,23 +296,10 @@ export class Player extends WorldObject {
       this.updateInteractionPromptText();
     }
 
-    // Update the visibility and position of the interaction prompt
-    if (this.interactionPrompt) {
-      const shouldBeVisible = Boolean(this.currentInteractable);
-
-      this.interactionPrompt.visible = shouldBeVisible;
-
-      if (shouldBeVisible) {
-        const relativeOffset = new THREE.Vector3(0, 0.05, -1);
-
-        relativeOffset.applyQuaternion(this.camera.quaternion);
-
-        this.interactionPrompt.position
-          .copy(this.camera.position)
-          .add(relativeOffset);
-
-        this.interactionPrompt.lookAt(this.camera.position);
-      }
+    if (this.currentInteractable) {
+      $interactionPrompt.classList.remove('hidden');
+    } else {
+      $interactionPrompt.classList.add('hidden');
     }
   }
 

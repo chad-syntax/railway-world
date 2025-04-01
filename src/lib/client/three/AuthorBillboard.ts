@@ -93,6 +93,10 @@ export class AuthorBillboard extends Billboard {
 
   onUpdate(delta: number): void {}
 
+  getInteractionText(): string {
+    return 'View Railway World GitHub';
+  }
+
   onInteract(): void {
     this.world.unlockControls();
 

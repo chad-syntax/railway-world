@@ -18,9 +18,7 @@ import {
   STATUS_SLEEPING_HEX,
   STATUS_FAILED_HEX,
   STATUS_DEFAULT_HEX,
-  VOLUME_BLACK_HEX,
   UI_WHITE_HEX,
-  LIGHT_STEEL_BLUE_HEX,
 } from '../../../lib/colors';
 
 const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
@@ -685,6 +683,10 @@ export class ServiceStructure extends WorldObject {
     if (this.isFireAnimating) {
       this.updateFireAnimation(delta);
     }
+  }
+
+  getInteractionText(): string {
+    return `View ${this.service.name} in Railway`;
   }
 
   onInteract(): void {

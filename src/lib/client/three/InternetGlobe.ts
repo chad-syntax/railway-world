@@ -145,4 +145,16 @@ export class InternetGlobe extends WorldObject {
     // rotate the whole group slightly
     this.group.rotation.y += (-Math.PI / 36) * delta;
   }
+
+  getInteractionText(): string {
+    return `Visit ${this.domains[0]}`;
+  }
+
+  onInteract(): void {
+    this.world.unlockControls();
+
+    const domainUrl = `https://${this.domains[0]}`;
+
+    window.open(domainUrl, '_blank');
+  }
 }

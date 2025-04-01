@@ -176,6 +176,10 @@ export class VolumeStructure extends WorldObject {
 
   onUpdate(delta: number): void {}
 
+  getInteractionText(): string {
+    return `View ${this.volume.name} in Railway`;
+  }
+
   onInteract(): void {
     this.world.unlockControls();
 

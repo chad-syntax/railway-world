@@ -177,6 +177,10 @@ export class ProjectBillboard extends Billboard {
 
   onUpdate(delta: number): void {}
 
+  getInteractionText(): string {
+    return `View Project in Railway`;
+  }
+
   onInteract(): void {
     this.world.unlockControls();
 
