@@ -2,7 +2,14 @@ import * as THREE from 'three';
 import { Volume } from '../../types';
 import { World } from './World';
 import { WorldObject, Position } from './WorldObject';
-import { GRAY_1, RED, YELLOW, LIME_GREEN, BLACK } from '../../../lib/colors';
+import {
+  GRAY_1,
+  RED,
+  YELLOW,
+  LIME_GREEN,
+  BLACK,
+  OFF_WHITE,
+} from '../../../lib/colors';
 
 type VolumeStructureOptions = {
   name: string;
@@ -21,6 +28,7 @@ export class VolumeStructure extends WorldObject {
   private iconMesh: THREE.Mesh | null = null;
   private innerVolumeMesh: THREE.Mesh | null = null;
   private wireframeMesh: THREE.Mesh | null = null;
+  private outlineMesh: THREE.Mesh | null = null;
 
   constructor(options: VolumeStructureOptions) {
     super(options);
@@ -63,6 +71,19 @@ export class VolumeStructure extends WorldObject {
     this.wireframeMesh = new THREE.Mesh(geometry, wireframeMaterial);
     this.wireframeMesh.position.y = this.height / 2;
     this.group.add(this.wireframeMesh);
+
+    // Create the outline mesh (using the same geometry)
+    const outlineMaterial = new THREE.MeshBasicMaterial({
+      color: OFF_WHITE,
+      side: THREE.BackSide,
+      transparent: false,
+    });
+    this.outlineMesh = new THREE.Mesh(geometry.clone(), outlineMaterial);
+    this.outlineMesh.position.copy(this.wireframeMesh.position); // Match position
+    this.outlineMesh.scale.multiplyScalar(1.05); // Slightly larger
+    this.outlineMesh.visible = false; // Initially hidden
+    this.outlineMesh.renderOrder = -1; // Render before the main structure
+    this.group.add(this.outlineMesh);
 
     // Create inner volume cube that shows usage
     const innerHeight = this.height * this.usage;
@@ -164,6 +185,18 @@ export class VolumeStructure extends WorldObject {
   }
 
   onUpdate(delta: number): void {}
+
+  public showOutline(): void {
+    if (this.outlineMesh) {
+      this.outlineMesh.visible = true;
+    }
+  }
+
+  public hideOutline(): void {
+    if (this.outlineMesh) {
+      this.outlineMesh.visible = false;
+    }
+  }
 
   getInteractionText(): string {
     return `View ${this.volume.name} in Railway`;

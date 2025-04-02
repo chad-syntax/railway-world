@@ -26,7 +26,7 @@ This is a quick side project to re-familiarize myself with threejs and web graph
 
 ### Prerequisites
 
-- Node.js (v22+ recommended)
+- Node.js (v22.14.0 recommended)
 - A Railway account with API access
 - Your Railway API token
 - The project ID of the Railway project you want to visualize
@@ -85,10 +85,13 @@ The application consists of:
 ### Project Structure
 
 - `src/client.ts`: Frontend client entry point
+- `src/server.ts`: Backend server entry point
 - `src/lib/`: Core library code
   - `types.ts`: TypeScript type definitions
   - `constants.ts`: Application constants
   - `utils.ts`: Shared utility functions
+  - `colors.ts`: Color definitions for visualization
+  - `mock-data.ts`: Mock data for development/testing
   - `client/`: Frontend-specific code
     - `three/`: Three.js visualization components
       - `World.ts`: Main Three.js scene management
@@ -101,11 +104,13 @@ The application consists of:
       - `Billboard.ts`: Base class for billboard text overlays
       - `AuthorBillboard.ts`: Author attribution display
       - `ProjectBillboard.ts`: Project information display
+      - `Player.ts`: First-person player controls and camera
     - `websocket.ts`: WebSocket client for real-time updates
     - `fetch-railway-data.ts`: Railway API data fetching
   - `server/`: Backend-specific code
     - `graphql/`: Railway GraphQL API integration
     - `handlers/`: API route handlers
+    - `LiveDataService.ts`: Service for managing live data updates
 
 ## Development
 

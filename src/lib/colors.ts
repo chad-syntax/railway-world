@@ -37,6 +37,9 @@ export const DARK_BLUE_HEX_STR = hexStr(DARK_BLUE);
 export const PURPLE = 0x612ad5;
 export const PURPLE_HEX_STR = hexStr(PURPLE);
 
+export const OFF_WHITE = 0xf5f5f5;
+export const OFF_WHITE_HEX_STR = hexStr(OFF_WHITE);
+
 // Grays ordered light to dark
 export const GRAY_1 = 0xc3c3c3;
 export const GRAY_1_HEX_STR = hexStr(GRAY_1);

@@ -48,7 +48,7 @@ export class World {
   private ambientLight: THREE.AmbientLight;
   private directionalLight: THREE.DirectionalLight;
   private ground: THREE.Mesh;
-  private gridHelper: THREE.GridHelper;
+  // private gridHelper: THREE.GridHelper;
   private requestBlockSpawnOffset = 0;
 
   constructor(options: WorldConstructorOptions) {
@@ -80,10 +80,16 @@ export class World {
     this.directionalLight.shadow.camera.far = 50;
     this.scene.add(this.directionalLight);
 
+    const groundTexture = new THREE.TextureLoader().load('/grass.jpg');
+    groundTexture.wrapS = THREE.RepeatWrapping;
+    groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set(100, 100); // Repeat 100 times in both directions
+
     // Create a ground plane
     this.ground = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
       new THREE.MeshStandardMaterial({
+        map: groundTexture,
         color: GREEN, // Grass green color
         side: THREE.DoubleSide,
       })
@@ -95,8 +101,8 @@ export class World {
     this.scene.add(this.ground);
 
     // Add a grid helper for visual reference
-    this.gridHelper = new THREE.GridHelper(100, 100);
-    this.scene.add(this.gridHelper);
+    // this.gridHelper = new THREE.GridHelper(100, 100);
+    // this.scene.add(this.gridHelper);
 
     this.player = new Player({ world: this });
 
@@ -304,7 +310,7 @@ export class World {
         service,
         position: {
           x,
-          y: 0,
+          y: 0.02,
           z,
         },
         deployment: service.latestDeployment,

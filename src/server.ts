@@ -1,8 +1,8 @@
 import Fastify from 'fastify';
 import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
-import { fileURLToPath } from 'url';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { handleRailwayData } from './lib/server/handlers/api-railway-data';
 import { handleIcon } from './lib/server/handlers/api-icon';
 import { config } from 'dotenv';

@@ -20,6 +20,7 @@ import {
   GRAY_1_HEX_STR,
   WHITE_HEX_STR,
   BLACK_HEX_STR,
+  OFF_WHITE,
 } from '../../../lib/colors';
 
 const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
@@ -103,6 +104,7 @@ export class ServiceStructure extends WorldObject {
   private readonly FIRE_SPRITE_COLS = 8; // 8 columns
   private readonly FIRE_SPRITE_ROWS = 4; // 4 rows
   private fireAnimationTime: number = 0;
+  private outlineMesh: THREE.Mesh | null = null; // Mesh for proximity outline
 
   constructor(options: ServiceStructureConstructorOptions) {
     super(options);
@@ -143,6 +145,20 @@ export class ServiceStructure extends WorldObject {
 
     // Add serviceStructure and name to group
     this.group.add(this.serviceStructure);
+
+    // Create the outline mesh
+    const outlineGeometry = geometry.clone();
+    const outlineMaterial = new THREE.MeshBasicMaterial({
+      color: OFF_WHITE,
+      side: THREE.BackSide, // Render only the back faces
+      transparent: false,
+    });
+    this.outlineMesh = new THREE.Mesh(outlineGeometry, outlineMaterial);
+    this.outlineMesh.position.copy(this.serviceStructure.position); // Match position
+    this.outlineMesh.scale.multiplyScalar(1.01); // Slightly larger
+    this.outlineMesh.visible = false; // Initially hidden
+    this.outlineMesh.renderOrder = -1; // Render before the main structure
+    this.group.add(this.outlineMesh);
 
     // Create and add the icon to the front face if an icon URL is provided
     if (this.service.icon) {
@@ -377,6 +393,8 @@ export class ServiceStructure extends WorldObject {
     const zSize = 0.5;
     const geometry = new THREE.PlaneGeometry(zSize, zSize);
     const mesh = new THREE.Mesh(geometry, material);
+
+    mesh.userData.ignoreInteraction = true;
 
     mesh.position.set(this.width / 2 - 0.5, this.height, this.depth / 2 - 0.5);
     mesh.scale.set(this.Z_START_SCALE, this.Z_START_SCALE, this.Z_START_SCALE);
@@ -681,6 +699,18 @@ export class ServiceStructure extends WorldObject {
     }
     if (this.isFireAnimating) {
       this.updateFireAnimation(delta);
+    }
+  }
+
+  public showOutline(): void {
+    if (this.outlineMesh) {
+      this.outlineMesh.visible = true;
+    }
+  }
+
+  public hideOutline(): void {
+    if (this.outlineMesh) {
+      this.outlineMesh.visible = false;
     }
   }
 

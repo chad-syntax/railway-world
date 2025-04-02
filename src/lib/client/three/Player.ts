@@ -44,7 +44,7 @@ export class Player extends WorldObject {
   private SPEED = Player.NORMAL_SPEED;
   private VERTICAL_SPEED = Player.NORMAL_VERTICAL_SPEED;
   private JUMP_FORCE = 7;
-  private isWalkingMode = false;
+  private isWalkingMode = true;
   private GRAVITY = 9.8;
   private isGrounded = false;
   private verticalVelocity = 0;
@@ -221,6 +221,22 @@ export class Player extends WorldObject {
     this.currentInteractable = foundInteractable;
 
     if (this.currentInteractable !== previousInteractable) {
+      // Hide outline on the previous object if it exists and has the method
+      if (
+        previousInteractable &&
+        typeof (previousInteractable as any).hideOutline === 'function'
+      ) {
+        (previousInteractable as any).hideOutline();
+      }
+
+      // Show outline on the new object if it exists and has the method
+      if (
+        this.currentInteractable &&
+        typeof (this.currentInteractable as any).showOutline === 'function'
+      ) {
+        (this.currentInteractable as any).showOutline();
+      }
+
       this.updateInteractionPromptText();
     }
 

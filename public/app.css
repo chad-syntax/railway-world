@@ -89,7 +89,7 @@ body {
   top: calc(50% - 48px);
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.35);
   padding: 10px;
   border-radius: 5px;
   color: white;
