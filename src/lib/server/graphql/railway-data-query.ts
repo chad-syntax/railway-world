@@ -31,8 +31,10 @@ query RailwayData($id: String!) {
                 serviceName
                 latestDeployment {
                   id
+                  snapshotId
                   status
                   updatedAt
+                  createdAt
                 }
                 domains {
                   customDomains {

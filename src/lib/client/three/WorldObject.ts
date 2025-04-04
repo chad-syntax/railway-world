@@ -165,6 +165,8 @@ export abstract class WorldObject {
 
     sprite.position.set(position.x, position.y, position.z);
 
+    sprite.renderOrder = 2;
+
     sprite.userData.ignoreInteraction = true;
 
     this.group.add(sprite);

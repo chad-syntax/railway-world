@@ -7,6 +7,10 @@ import {
   Deployment,
   WebSocketLatestDeploymentsEvent,
   DeploymentStatus,
+  WebSocketDeployLogsEvent,
+  DeployLog,
+  HttpLog,
+  WebSocketHttpLogsEvent,
 } from '../../types';
 import {
   SERVICE_NODEJS,
@@ -21,6 +25,8 @@ import {
   WHITE_HEX_STR,
   BLACK_HEX_STR,
   OFF_WHITE,
+  BLACK,
+  RED,
 } from '../../../lib/colors';
 
 const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
@@ -57,6 +63,13 @@ const DEPLOYMENT_STATUS_EMOJI: Record<DeploymentStatus, string> = {
   WAITING: '⌛',
 } as const;
 
+const LOG_SEVERITY_EMOJI: Record<string, string> = {
+  info: '🟦', // Blue for info
+  warn: '🟨', // Yellow for warn
+  error: '🟥', // Red for error
+  default: '⬜️', // Default white
+};
+
 type ServiceStructureConstructorOptions = {
   name: string;
   world: World;
@@ -66,45 +79,72 @@ type ServiceStructureConstructorOptions = {
 };
 
 export class ServiceStructure extends WorldObject {
+  // Basic Properties
   public deployment: Deployment;
   public service: Service;
   public width: number = 3;
   public height: number = 3;
   public depth: number = 3;
 
+  // Core Mesh
   private serviceStructure: THREE.Mesh;
   private serviceStructureColor: number;
-  private nameColor: string;
+
+  // Icon Meshes
   private iconMesh: THREE.Mesh | null = null;
   private sourceIconMesh: THREE.Mesh | null = null;
+
+  // Text Meshes
   private sourceTextMesh: THREE.Mesh | null = null;
   private statusMesh: THREE.Mesh | null = null;
+
+  // Outline Mesh
+  private outlineMesh: THREE.Mesh | null = null; // Mesh for proximity outline
+
+  // Oscillating Opacity Animation
   private isOscillatingOpacity: boolean = false;
   private oscillatingOpacityDirection: boolean = true;
   private oscillatingOpacityState: number = 0.25;
-  private isSleepAnimating: boolean = false;
-  private sleepingZs: THREE.Mesh[] = [];
-  private nextZSpawnTime: number = 0;
   private readonly OSCILLATING_OPACITY_SPEED = 0.5;
   private readonly OSCILLATING_OPACITY_MIN = 0.25;
   private readonly OSCILLATING_OPACITY_MAX = 0.9;
+
+  // Sleeping Animation
+  private isSleepAnimating: boolean = false;
+  private sleepingZs: THREE.Mesh[] = [];
+  private nextZSpawnTime: number = 0;
   private readonly Z_SPAWN_INTERVAL = 1.5; // Spawn a new Z every 2 seconds
   private readonly Z_FLOAT_SPEED = 0.5; // Units per second
   private readonly Z_GROW_SPEED = 0.5; // Scale increase per second
   private readonly Z_MAX_SCALE = 3; // Maximum scale before Z disappears
   private readonly Z_START_SCALE = 0; // Initial scale of Z
   private readonly Z_COLOR = BLUE_HEX_STR; // Use the BLUE status color
+
+  // Fire Animation
   private isFireAnimating: boolean = false;
   private fireMeshes: THREE.Mesh[] = [];
   private fireTexture: THREE.Texture | null = null;
   private currentFireFrame: number = 0;
+  private fireAnimationTime: number = 0;
   private readonly FIRE_TEXTURE_SIZE = 1;
   private readonly FIRE_FRAME_INTERVAL = 0.15; // 150ms between frames
   private readonly TOTAL_FIRE_FRAMES = 32; // Total frames in spritesheet
   private readonly FIRE_SPRITE_COLS = 8; // 8 columns
   private readonly FIRE_SPRITE_ROWS = 4; // 4 rows
-  private fireAnimationTime: number = 0;
-  private outlineMesh: THREE.Mesh | null = null; // Mesh for proximity outline
+
+  // Deploy Logs Panel
+  private deployLogsPanel: THREE.Mesh | null = null;
+  private deployLogsTexture: THREE.CanvasTexture | null = null;
+  private deployLogsCanvas: HTMLCanvasElement | null = null;
+  private deployLogsCtx: CanvasRenderingContext2D | null = null;
+  private deployLogs: DeployLog[] = [];
+
+  // Http Logs Panel
+  private httpLogsPanel: THREE.Mesh | null = null;
+  private httpLogsTexture: THREE.CanvasTexture | null = null;
+  private httpLogsCanvas: HTMLCanvasElement | null = null;
+  private httpLogsCtx: CanvasRenderingContext2D | null = null;
+  private httpLogs: HttpLog[] = [];
 
   constructor(options: ServiceStructureConstructorOptions) {
     super(options);
@@ -119,8 +159,6 @@ export class ServiceStructure extends WorldObject {
       SERVICE_STRUCTURE_TYPE_COLORS[
         this.service.name.toLowerCase() as ServiceStructureTypeColors
       ] || SERVICE_STRUCTURE_TYPE_COLORS.default;
-
-    this.nameColor = WHITE_HEX_STR;
 
     // Create serviceStructure geometry
     const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
@@ -175,6 +213,14 @@ export class ServiceStructure extends WorldObject {
 
     this.addSvcLabel();
 
+    this.createDeployLogsPanel();
+
+    if (this.service.domains.length > 0) {
+      this.createHttpLogsPanel();
+
+      this.world.wsClient.onMessage('httpLogs', this.handleHttpLogs);
+    }
+
     // Position the entire group
     this.group.position.set(this.position.x, this.position.y, this.position.z);
 
@@ -182,6 +228,321 @@ export class ServiceStructure extends WorldObject {
       'latestDeployments',
       this.handleLatestDeploymentsUpdate
     );
+
+    this.world.wsClient.onMessage('deployLogs', this.handleDeployLogs);
+  }
+
+  private createHttpLogsPanel(): void {
+    // Panel size slightly smaller than the face
+    const panelWidth = this.width * 0.95;
+    const panelHeight = this.height * 0.9;
+    const geometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+
+    const { texture } = this.createTextTexture('HTTP Logs', {
+      fontSize: 64,
+      canvasWidth: 2048,
+      canvasHeight: 128,
+      strokeWidth: 6,
+    });
+
+    const panelTitleMaterial = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+
+    const panelTitleGeometry = new THREE.PlaneGeometry(
+      panelWidth,
+      this.height * 0.05
+    );
+
+    const panelTitleMesh = new THREE.Mesh(
+      panelTitleGeometry,
+      panelTitleMaterial
+    );
+
+    panelTitleMesh.rotation.y = -Math.PI / 2;
+    panelTitleMesh.position.set(
+      -(this.width / 2) - 0.01,
+      this.height - this.height * 0.05,
+      0
+    );
+    panelTitleMesh.renderOrder = 1;
+    this.group.add(panelTitleMesh);
+
+    // Setup canvas for drawing logs
+    this.httpLogsCanvas = document.createElement('canvas');
+    // Resolution can be adjusted based on visual needs
+    this.httpLogsCanvas.width = 2048;
+    this.httpLogsCanvas.height = 2048;
+    this.httpLogsCtx = this.httpLogsCanvas.getContext('2d');
+
+    // Create texture from canvas
+    this.httpLogsTexture = new THREE.CanvasTexture(this.httpLogsCanvas);
+    this.httpLogsTexture.needsUpdate = true; // Ensure initial texture is used
+    this.httpLogsTexture.minFilter = THREE.LinearFilter;
+    this.httpLogsTexture.magFilter = THREE.LinearFilter;
+
+    // Black, opaque material using the canvas texture
+    const material = new THREE.MeshBasicMaterial({
+      map: this.httpLogsTexture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+
+    this.httpLogsPanel = new THREE.Mesh(geometry, material);
+    // Position slightly to the left of the service cube's left face
+    this.httpLogsPanel.position.set(
+      -(this.width / 2) - 0.01,
+      this.height / 2 - this.height * 0.025,
+      0
+    );
+
+    this.httpLogsPanel.renderOrder = 1;
+    this.httpLogsPanel.rotation.y = -Math.PI / 2;
+
+    this.group.add(this.httpLogsPanel);
+
+    this.updateHttpLogsTexture();
+  }
+
+  private createDeployLogsPanel(): void {
+    // Panel size slightly smaller than the face
+    const panelWidth = this.width * 0.95;
+    const panelHeight = this.height * 0.9;
+    const geometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+
+    const { texture } = this.createTextTexture('Deploy Logs', {
+      fontSize: 64,
+      canvasWidth: 2048,
+      canvasHeight: 128,
+      strokeWidth: 6,
+    });
+
+    const panelTitleMaterial = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+
+    const panelTitleGeometry = new THREE.PlaneGeometry(
+      panelWidth,
+      this.height * 0.05
+    );
+
+    const panelTitleMesh = new THREE.Mesh(
+      panelTitleGeometry,
+      panelTitleMaterial
+    );
+
+    panelTitleMesh.rotation.y = Math.PI;
+
+    panelTitleMesh.position.set(
+      0,
+      this.height - this.height * 0.05,
+      -(this.depth / 2) - 0.01
+    );
+    panelTitleMesh.renderOrder = 1;
+    this.group.add(panelTitleMesh);
+
+    // Setup canvas for drawing logs
+    this.deployLogsCanvas = document.createElement('canvas');
+    // Resolution can be adjusted based on visual needs
+    this.deployLogsCanvas.width = 2048;
+    this.deployLogsCanvas.height = 2048;
+    this.deployLogsCtx = this.deployLogsCanvas.getContext('2d');
+
+    // Create texture from canvas
+    this.deployLogsTexture = new THREE.CanvasTexture(this.deployLogsCanvas);
+    this.deployLogsTexture.needsUpdate = true; // Ensure initial texture is used
+    this.deployLogsTexture.minFilter = THREE.LinearFilter;
+    this.deployLogsTexture.magFilter = THREE.LinearFilter;
+
+    // Black, opaque material using the canvas texture
+    const material = new THREE.MeshBasicMaterial({
+      map: this.deployLogsTexture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+
+    this.deployLogsPanel = new THREE.Mesh(geometry, material);
+    // Position slightly behind the service cube's back face
+    this.deployLogsPanel.position.set(
+      0,
+      this.height / 2 - this.height * 0.025,
+      -(this.depth / 2) - 0.01
+    );
+    this.deployLogsPanel.renderOrder = 1;
+
+    this.deployLogsPanel.rotation.y = Math.PI;
+    this.group.add(this.deployLogsPanel);
+
+    this.updateDeployLogsTexture(); // Draw initial state
+  }
+
+  private handleDeployLogs = (event: WebSocketDeployLogsEvent) => {
+    const { logs, deploymentId } = event;
+
+    if (deploymentId === this.deployment.id && logs.length > 0) {
+      this.deployLogs.push(...logs);
+
+      // Keep only the latest 100 logs in memory
+      if (this.deployLogs.length > 120) {
+        this.deployLogs = this.deployLogs.slice(-120);
+      }
+
+      // Update the texture on the panel
+      this.updateDeployLogsTexture();
+    }
+  };
+
+  private handleHttpLogs = (event: WebSocketHttpLogsEvent) => {
+    const { logs, deploymentId } = event;
+
+    if (deploymentId === this.deployment.id && logs.length > 0) {
+      this.httpLogs.push(...logs);
+
+      // Keep only the latest 100 logs in memory
+      if (this.httpLogs.length > 120) {
+        this.httpLogs = this.httpLogs.slice(-120);
+      }
+
+      this.updateHttpLogsTexture();
+    }
+  };
+
+  private updateHttpLogsTexture(): void {
+    if (!this.httpLogsCtx || !this.httpLogsCanvas || !this.httpLogsTexture)
+      return;
+
+    const ctx = this.httpLogsCtx;
+    const canvas = this.httpLogsCanvas;
+
+    // Clear canvas with a black background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Set text style
+    const fontSize = 20; // Updated font size
+
+    ctx.fillStyle = WHITE_HEX_STR; // White text
+
+    // Draw logs from bottom up on canvas (appears top-down on panel)
+    const lineHeight = fontSize * 1.3; // Spacing between lines
+    let y = canvas.height - lineHeight * 0.5; // Start near the bottom
+
+    // Draw a placeholder if no logs yet
+    if (this.httpLogs.length === 0) {
+      ctx.fillStyle = GRAY_1_HEX_STR; // Dim color for placeholder
+      ctx.font = `128px Monospace`; // Monospace for alignment
+
+      ctx.textAlign = 'center';
+      ctx.fillText('Waiting for logs...', canvas.width / 2, canvas.height / 2);
+      ctx.fillStyle = WHITE_HEX_STR; // Reset color
+    } else {
+      ctx.font = `${fontSize}px Monospace`; // Monospace for alignment
+      ctx.textAlign = 'left';
+
+      for (let i = this.httpLogs.length - 1; i >= 0; i--) {
+        const log = this.httpLogs[i];
+
+        // Format timestamp (e.g., "Mar 31 17:46:40")
+        const timestamp = new Date(log.timestamp).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+
+        const emoji =
+          log.httpStatus >= 500 ? '🟥' : log.httpStatus >= 400 ? '🟨' : '🟩';
+
+        const logLine = `${emoji} | ${timestamp} | ${log.httpStatus} | ${log.method} | ${log.path}`;
+
+        // Draw text
+        ctx.fillText(logLine, 10, y); // Add padding from left edge
+
+        y -= lineHeight; // Move up for the next line
+
+        // Stop if we run out of canvas space vertically
+        if (y < fontSize) break;
+      }
+    }
+
+    // Tell Three.js to update the texture
+    this.httpLogsTexture.needsUpdate = true;
+  }
+
+  private updateDeployLogsTexture(): void {
+    if (
+      !this.deployLogsCtx ||
+      !this.deployLogsCanvas ||
+      !this.deployLogsTexture
+    )
+      return;
+
+    const ctx = this.deployLogsCtx;
+    const canvas = this.deployLogsCanvas;
+
+    // Clear canvas with a black background
+    // ctx.fillStyle = RED_HEX_STR; // Black background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Set text style
+    const fontSize = 20; // Updated font size
+
+    ctx.fillStyle = WHITE_HEX_STR; // White text
+
+    // Get the latest logs to display (up to MAX_LOG_LINES_DISPLAYED)
+    const logsToDisplay = this.deployLogs;
+
+    // Draw logs from bottom up on canvas (appears top-down on panel)
+    const lineHeight = fontSize * 1.3; // Spacing between lines
+    let y = canvas.height - lineHeight * 0.5; // Start near the bottom
+
+    // Draw a placeholder if no logs yet
+    if (logsToDisplay.length === 0) {
+      ctx.fillStyle = GRAY_1_HEX_STR; // Dim color for placeholder
+      ctx.font = `128px Monospace`; // Monospace for alignment
+
+      ctx.textAlign = 'center';
+      ctx.fillText('Waiting for logs...', canvas.width / 2, canvas.height / 2);
+      ctx.fillStyle = WHITE_HEX_STR; // Reset color
+    } else {
+      ctx.font = `${fontSize}px Monospace`; // Monospace for alignment
+      ctx.textAlign = 'left';
+
+      for (let i = logsToDisplay.length - 1; i >= 0; i--) {
+        const log = logsToDisplay[i];
+        const severity = log.severity.toLowerCase();
+        const emoji =
+          LOG_SEVERITY_EMOJI[severity] || LOG_SEVERITY_EMOJI.default;
+
+        // Format timestamp (e.g., "Mar 31 17:46:40")
+        const timestamp = new Date(log.timestamp).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+
+        const logLine = `${emoji} | ${timestamp} | ${log.message}`;
+
+        // Draw text
+        ctx.fillText(logLine, 10, y); // Add padding from left edge
+
+        y -= lineHeight; // Move up for the next line
+
+        // Stop if we run out of canvas space vertically
+        if (y < fontSize) break;
+      }
+    }
+
+    // Tell Three.js to update the texture
+    this.deployLogsTexture.needsUpdate = true;
   }
 
   private addSvcLabel(): void {

@@ -7,7 +7,8 @@ import {
   RailwayData,
   Service,
   WebSocketLatestDeploymentsEvent,
-  WebSocketLogsEvent,
+  WebSocketHttpLogsEvent,
+  WebSocketDeployLogsEvent,
 } from '../../types';
 import { VolumeStructure } from './VolumeStructure';
 import { ProjectBillboard } from './ProjectBillboard';
@@ -111,13 +112,13 @@ export class World {
     // Handle window resize
     window.addEventListener('resize', this.onResize);
 
-    this.wsClient.onMessage('logs', this.handleLogs);
+    this.wsClient.onMessage('httpLogs', this.handleLogs);
     this.wsClient.onMessage('latestDeployments', this.handleLatestDeployments);
 
     this.populate();
   }
 
-  private handleLogs = (event: WebSocketLogsEvent) => {
+  private handleLogs = (event: WebSocketHttpLogsEvent) => {
     const targetService = this.railwayData.services.find(
       (service) => service.latestDeployment.id === event.deploymentId
     );
@@ -128,6 +129,10 @@ export class World {
     }
 
     this.populateRequest(targetService, event.logs);
+  };
+
+  private handleDeployLogs = (event: WebSocketDeployLogsEvent) => {
+    console.log('deployLogs', event);
   };
 
   private handleLatestDeployments = (
@@ -310,7 +315,7 @@ export class World {
         service,
         position: {
           x,
-          y: 0.02,
+          y: 0.01,
           z,
         },
         deployment: service.latestDeployment,

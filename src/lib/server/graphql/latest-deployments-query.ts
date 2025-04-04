@@ -21,8 +21,10 @@ query LatestDeployments($id: String!) {
                 }
                 latestDeployment {
                   id
+                  snapshotId
                   status
                   updatedAt
+                  createdAt
                 }
               }
             }
@@ -53,8 +55,10 @@ export type LatestDeploymentsResponse = {
                 };
                 latestDeployment: {
                   id: string;
+                  snapshotId: string;
                   status: DeploymentStatus;
                   updatedAt: string;
+                  createdAt: string;
                 };
               };
             }[];

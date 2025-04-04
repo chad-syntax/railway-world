@@ -18,7 +18,8 @@ export class WebSocketClient {
     ) => void)[];
   } = {
     pong: [],
-    logs: [],
+    httpLogs: [],
+    deployLogs: [],
     latestDeployments: [],
   };
 

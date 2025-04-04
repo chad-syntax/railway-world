@@ -5,24 +5,28 @@ import {
   RailwayData,
   HttpLog,
   LatestDeployment,
+  Service,
+  DeployLog,
 } from '../types';
 import { GRAPHQL_WS_API_URL } from '../constants';
 import { railwayDataQuery } from './graphql/railway-data-query';
 import { gqlRequest } from './graphql/request';
 import { processRailwayData } from './graphql/railway-data-query';
-import { railwayHttpLogsSubscription } from './graphql/railway-http-logs-subscription';
+import { RAILWAY_HTTP_LOGS_SUBSCRIPTION } from './graphql/railway-http-logs-subscription';
 import {
   LatestDeploymentsResponse,
   requestLatestDeployments,
 } from './graphql/latest-deployments-query';
 import { config } from 'dotenv';
 import {
-  mockHttpLogs,
-  mockLatestDeployments,
-  mockRailwayData,
-  MOCK_HTTP_LOG_DEPLOYMENT_ID,
+  MOCK_HTTP_LOGS,
+  MOCK_LATEST_DEPLOYMENTS,
+  MOCK_RAILWAY_DATA,
+  MOCK_POSTIZ_LATEST_DEPLOYMENT_ID,
+  MOCK_LATEST_DEPLOYMENTS_LOGS_MAP,
 } from '../mock-data';
 import { wait } from '../utils';
+import { RAILWAY_DEPLOY_LOGS_SUBSCRIPTION } from './graphql/railway-deploy-logs-subscription';
 
 config();
 
@@ -32,7 +36,7 @@ const isMockDataMode = process.env.MOCK_DATA === 'true';
 
 const getRailwayData = async (): Promise<RailwayData> => {
   if (isMockDataMode) {
-    return processRailwayData(mockRailwayData);
+    return processRailwayData(MOCK_RAILWAY_DATA);
   }
 
   if (!railwayToken || !railwayProjectId) {
@@ -59,21 +63,31 @@ const getRailwayData = async (): Promise<RailwayData> => {
 };
 
 export class LiveDataService {
+  // GQL WebSocket state
   private gqlWs: WebSocket | null = null;
+  private gqlReSubscribeTimeout: NodeJS.Timeout | null = null;
+  private gqlConnectAttempts: number = 0;
+  private gqlSubscriptions: Set<string> = new Set();
+  private gqlServiceSubscriptions: Map<string, Set<string>> = new Map();
+
+  // Our WebSocket state
   private clientConnections: WebSocket[] = [];
-  private gqlSubscriptionTimeout: NodeJS.Timeout | null = null;
   private isIntentionalClose: boolean = false;
-  private railwayDataPromise: Promise<RailwayData>;
-  private httpDeploymentIds: string[] = [];
+
+  // Railway data state
+  private initialRailwayDataPromise: Promise<RailwayData>;
+  private initialRailwayDataAttempts: number = 0;
+
+  // Latest deployments polling state
   private latestDeployments: LatestDeployment[] | null = null;
   private latestDeploymentsInterval: NodeJS.Timeout | null = null;
-  private gqlDeploymentSubscriptions: Set<string> = new Set();
-  private attempts: number = 0;
   private latestDeploymentsIntervalMs: number = 5 * 1000; // every 5 seconds, more will surpass rate limit
-  private railwayDataAttempts: number = 0;
+
+  // Mock data state
   private mockHttpLogsInterval: NodeJS.Timeout | null = null;
+
   constructor() {
-    this.railwayDataPromise = this.initializeRailwayData();
+    this.initialRailwayDataPromise = this.initializeRailwayData();
   }
 
   private initializeRailwayData = async () => {
@@ -84,8 +98,13 @@ export class LiveDataService {
         data = await getRailwayData();
       } catch (error) {
         console.error('Error initializing railway data:', error);
-        this.railwayDataAttempts++;
-        await wait(this.railwayDataAttempts ** 2 * 1000);
+        this.initialRailwayDataAttempts++;
+        await wait(this.initialRailwayDataAttempts ** 2 * 1000);
+
+        if (this.initialRailwayDataAttempts > 5) {
+          console.error('Failed to initialize railway data');
+          throw error;
+        }
       }
     }
 
@@ -189,33 +208,69 @@ export class LiveDataService {
     );
   };
 
-  private sendGqlSubscriptionsCommand = (deploymentId: string) => {
-    if (this.gqlDeploymentSubscriptions.has(deploymentId) || isMockDataMode) {
-      return;
+  private sendGqlSubscriptionsCommand = (options: {
+    environmentId: string;
+    service: Service;
+  }) => {
+    const { environmentId, service } = options;
+
+    const isHttpService = service.domains.length > 0;
+
+    const subscriptionIds = new Set<string>();
+
+    if (isHttpService) {
+      const httpSubscriptionId = `http-${service.latestDeployment.id}`;
+      const httpLogsSubscribeMessage = {
+        id: httpSubscriptionId,
+        type: 'subscribe',
+        payload: {
+          query: RAILWAY_HTTP_LOGS_SUBSCRIPTION,
+          variables: {
+            deploymentId: service.latestDeployment.id,
+            beforeLimit: 500,
+            // do not fetch previous logs, only latest because of the real-time nature of the request visualization
+            beforeDate: new Date().toISOString(),
+          },
+        },
+      };
+
+      console.log('sending subscribe command', httpSubscriptionId);
+
+      this.gqlWs!.send(JSON.stringify(httpLogsSubscribeMessage));
+      this.gqlSubscriptions.add(httpSubscriptionId);
+      subscriptionIds.add(httpSubscriptionId);
     }
 
-    console.log('Subscribing to deployment', deploymentId);
+    const deployLogsSubscriptionId = `deploy-${service.latestDeployment.id}`;
+    const beforeDate = service.latestDeployment.createdAt;
+    const filter = `(  ) @deployment:${service.latestDeployment.id} -@replica:${service.latestDeployment.snapshotId}`;
 
-    const subscribeMessage = {
-      id: deploymentId,
+    const deployLogsSubscribeMessage = {
+      id: deployLogsSubscriptionId,
       type: 'subscribe',
       payload: {
-        query: railwayHttpLogsSubscription,
+        query: RAILWAY_DEPLOY_LOGS_SUBSCRIPTION,
         variables: {
-          deploymentId,
-          beforeLimit: 500,
-          beforeDate: new Date().toISOString(),
+          environmentId,
+          beforeLimit: 100,
+          beforeDate,
+          filter,
         },
       },
     };
 
-    this.gqlWs!.send(JSON.stringify(subscribeMessage));
-    this.gqlDeploymentSubscriptions.add(deploymentId);
+    console.log('sending subscribe command', deployLogsSubscriptionId);
+
+    subscriptionIds.add(deployLogsSubscriptionId);
+
+    this.gqlWs!.send(JSON.stringify(deployLogsSubscribeMessage));
+    this.gqlSubscriptions.add(deployLogsSubscriptionId);
+    this.gqlServiceSubscriptions.set(service.id, subscriptionIds);
   };
 
   private unsubscribeFromDeployment = (deploymentId: string) => {
     console.log('Unsubscribing from deployment', deploymentId);
-    this.gqlDeploymentSubscriptions.delete(deploymentId);
+    this.gqlSubscriptions.delete(deploymentId);
     this.gqlWs!.send(JSON.stringify({ id: deploymentId, type: 'unsubscribe' }));
   };
 
@@ -227,25 +282,43 @@ export class LiveDataService {
         case 'connection_ack':
           console.log('Connection acknowledged');
 
-          this.railwayDataPromise.then(() => {
-            for (const deploymentId of this.httpDeploymentIds) {
-              this.sendGqlSubscriptionsCommand(deploymentId);
+          this.initialRailwayDataPromise.then((initialRailwayData) => {
+            console.log('initializing subscriptions');
+
+            for (const service of initialRailwayData.services) {
+              this.sendGqlSubscriptionsCommand({
+                environmentId: initialRailwayData.environmentId,
+                service,
+              });
             }
           });
 
           break;
         case 'next':
-          if (message.id && message.payload?.data?.httpLogs) {
-            const httpLogs = message.payload.data.httpLogs as HttpLog[];
+          const httpLogs = message.payload.data.httpLogs as HttpLog[];
+
+          if (message.id && httpLogs) {
             if (httpLogs.length > 0) {
               this.clientConnections.forEach((conn) => {
                 this.sendClientMessage(conn, {
-                  eventName: 'logs',
-                  deploymentId: message.id,
+                  eventName: 'httpLogs',
+                  deploymentId: message.id.replace('http-', ''),
                   logs: httpLogs,
                 });
               });
             }
+          }
+          const deployLogs = message?.payload?.data
+            ?.environmentLogs as DeployLog[];
+
+          if (message.id && deployLogs) {
+            this.clientConnections.forEach((conn) => {
+              this.sendClientMessage(conn, {
+                eventName: 'deployLogs',
+                deploymentId: message.id.replace('deploy-', ''),
+                logs: deployLogs,
+              });
+            });
           }
           break;
         case 'error':
@@ -253,11 +326,11 @@ export class LiveDataService {
             'Subscription error:',
             JSON.stringify(message.payload, null, 2)
           );
-          this.gqlDeploymentSubscriptions.delete(message.id);
+          this.gqlSubscriptions.delete(message.id);
           break;
         case 'complete':
           console.log('Subscription completed');
-          this.gqlDeploymentSubscriptions.delete(message.id);
+          this.gqlSubscriptions.delete(message.id);
           break;
       }
     } catch (error) {
@@ -275,19 +348,19 @@ export class LiveDataService {
       intentional: this.isIntentionalClose,
     });
 
-    if (this.attempts < 3) {
+    if (this.gqlConnectAttempts < 3 && this.clientConnections.length > 0) {
       console.log('Attempting to reconnect to Railway GQL WebSocket...');
       if (!this.isIntentionalClose && !isDeadlineExceeded) {
-        this.attempts++;
+        this.gqlConnectAttempts++;
       }
 
       const retryTimeoutMs = isDeadlineExceeded
         ? 20 * 1000 // longer timeout for deadline exceeded, want to avoid rate limiting issues
-        : (this.attempts || 1) * 5000;
+        : (this.gqlConnectAttempts || 1) * 5000;
 
-      this.gqlSubscriptionTimeout = setTimeout(() => {
+      this.gqlReSubscribeTimeout = setTimeout(() => {
         this.gqlWs = null;
-        this.gqlDeploymentSubscriptions.clear();
+        this.gqlSubscriptions.clear();
         this.startGqlSubscriptionForLogs();
       }, retryTimeoutMs);
     } else {
@@ -304,10 +377,32 @@ export class LiveDataService {
         this.mockHttpLogsInterval = setInterval(() => {
           this.clientConnections.forEach((conn) => {
             this.sendClientMessage(conn, {
-              eventName: 'logs',
-              deploymentId: MOCK_HTTP_LOG_DEPLOYMENT_ID,
-              logs: mockHttpLogs,
+              eventName: 'httpLogs',
+              deploymentId: MOCK_POSTIZ_LATEST_DEPLOYMENT_ID,
+              logs: MOCK_HTTP_LOGS,
             });
+
+            const latestDeployments =
+              MOCK_LATEST_DEPLOYMENTS.project.environments.edges.flatMap(
+                (edge) =>
+                  edge.node.serviceInstances.edges.map(
+                    (instance) => instance.node
+                  )
+              );
+
+            for (const deployment of latestDeployments) {
+              const mockDeployLogs = MOCK_LATEST_DEPLOYMENTS_LOGS_MAP.get(
+                deployment.latestDeployment.id
+              );
+
+              if (mockDeployLogs) {
+                this.sendClientMessage(conn, {
+                  eventName: 'deployLogs',
+                  deploymentId: deployment.latestDeployment.id,
+                  logs: mockDeployLogs,
+                });
+              }
+            }
           });
         }, 10000);
       }
@@ -348,7 +443,7 @@ export class LiveDataService {
           return;
         }
       } else {
-        latestDeploymentsData = mockLatestDeployments;
+        latestDeploymentsData = MOCK_LATEST_DEPLOYMENTS;
       }
 
       const latestDeployments =
@@ -361,29 +456,49 @@ export class LiveDataService {
         JSON.stringify(this.latestDeployments) !==
           JSON.stringify(latestDeployments)
       ) {
-        const newHttpDeploymentIds = latestDeployments
-          .filter(
-            (deployment) =>
-              deployment.domains.serviceDomains.length > 0 ||
-              deployment.domains.customDomains.length > 0
-          )
-          .map((deployment) => deployment.latestDeployment.id);
+        for (const latestDeployment of latestDeployments) {
+          const subscriptionIds =
+            this.gqlServiceSubscriptions.get(latestDeployment.serviceId) ??
+            new Set<string>();
 
-        // if any deployments have been removed, unsubscribe from them
-        this.httpDeploymentIds.forEach((deploymentId) => {
-          if (!newHttpDeploymentIds.includes(deploymentId)) {
-            this.unsubscribeFromDeployment(deploymentId);
+          const isHttpService =
+            latestDeployment.domains.serviceDomains.length > 0 ||
+            latestDeployment.domains.customDomains.length > 0;
+
+          if (isHttpService) {
+            const httpSubscriptionId = `http-${latestDeployment.latestDeployment.id}`;
+            if (!subscriptionIds.has(httpSubscriptionId)) {
+              const currentServiceHttpSubscription = Array.from(
+                subscriptionIds
+              ).find((id) => id.startsWith('http-'));
+
+              if (currentServiceHttpSubscription) {
+                this.unsubscribeFromDeployment(currentServiceHttpSubscription);
+                subscriptionIds.delete(currentServiceHttpSubscription);
+              }
+              subscriptionIds.add(httpSubscriptionId);
+            }
           }
-        });
 
-        // if any new deployments have been added, subscribe to them
-        newHttpDeploymentIds.forEach((deploymentId) => {
-          if (!this.httpDeploymentIds.includes(deploymentId)) {
-            this.sendGqlSubscriptionsCommand(deploymentId);
+          if (
+            !subscriptionIds.has(
+              `deploy-${latestDeployment.latestDeployment.id}`
+            )
+          ) {
+            const currentServiceDeploySubscription = Array.from(
+              subscriptionIds
+            ).find((id) => id.startsWith('deploy-'));
+
+            if (currentServiceDeploySubscription) {
+              this.unsubscribeFromDeployment(currentServiceDeploySubscription);
+              subscriptionIds.delete(currentServiceDeploySubscription);
+            }
+
+            subscriptionIds.add(
+              `deploy-${latestDeployment.latestDeployment.id}`
+            );
           }
-        });
-
-        this.httpDeploymentIds = newHttpDeploymentIds;
+        }
 
         this.latestDeployments = latestDeployments;
         this.clientConnections.forEach((conn) => {
@@ -402,15 +517,15 @@ export class LiveDataService {
       this.mockHttpLogsInterval = null;
     }
 
-    this.attempts = 0;
+    this.gqlConnectAttempts = 0;
     if (this.gqlWs) {
       this.isIntentionalClose = true;
       this.gqlWs.close();
       this.gqlWs = null;
-      this.gqlDeploymentSubscriptions.clear();
-      if (this.gqlSubscriptionTimeout) {
-        clearTimeout(this.gqlSubscriptionTimeout);
-        this.gqlSubscriptionTimeout = null;
+      this.gqlSubscriptions.clear();
+      if (this.gqlReSubscribeTimeout) {
+        clearTimeout(this.gqlReSubscribeTimeout);
+        this.gqlReSubscribeTimeout = null;
       }
     }
   }

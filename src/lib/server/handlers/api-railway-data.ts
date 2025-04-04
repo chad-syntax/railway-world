@@ -5,7 +5,7 @@ import {
   processRailwayData,
 } from '../graphql/railway-data-query';
 import { RailwayData } from '../../types';
-import { mockRailwayData } from '../../mock-data';
+import { MOCK_RAILWAY_DATA } from '../../mock-data';
 
 export async function handleRailwayData(
   req: FastifyRequest,
@@ -41,7 +41,7 @@ export async function handleRailwayData(
         return reply.send({ data: processedData });
       }
 
-      const processedData: RailwayData = processRailwayData(mockRailwayData);
+      const processedData: RailwayData = processRailwayData(MOCK_RAILWAY_DATA);
 
       // Return the processed data
       return reply.send({ data: processedData });

@@ -18,6 +18,25 @@ export interface HttpLog {
   edgeRegion: string;
 }
 
+export interface DeployLog {
+  timestamp: string;
+  message: string;
+  severity: 'info' | 'warn' | 'error';
+  tags: {
+    projectId: string;
+    environmentId: string;
+    pluginId: string | null;
+    serviceId: string;
+    deploymentId: string;
+    deploymentInstanceId: string;
+    snapshotId: string | null;
+  };
+  attributes: {
+    key: string;
+    value: string;
+  }[];
+}
+
 export type Volume = {
   id: string;
   name: string;
@@ -52,8 +71,10 @@ export type DeploymentStatus =
 
 export type Deployment = {
   id: string;
+  snapshotId: string;
   status: DeploymentStatus;
   updatedAt: string;
+  createdAt: string;
 };
 
 export type Service = {
@@ -77,7 +98,12 @@ export interface RailwayData {
   environmentId: string;
 }
 
-export type WebSocketEventName = 'ping' | 'pong' | 'logs' | 'latestDeployments';
+export type WebSocketEventName =
+  | 'ping'
+  | 'pong'
+  | 'httpLogs'
+  | 'deployLogs'
+  | 'latestDeployments';
 
 export type ClientWebSocketEventName = Exclude<WebSocketEventName, 'ping'>;
 
@@ -91,10 +117,16 @@ export type WebSocketPongEvent = {
   ts: number;
 };
 
-export type WebSocketLogsEvent = {
-  eventName: 'logs';
+export type WebSocketHttpLogsEvent = {
+  eventName: 'httpLogs';
   deploymentId: string;
   logs: HttpLog[];
+};
+
+export type WebSocketDeployLogsEvent = {
+  eventName: 'deployLogs';
+  deploymentId: string;
+  logs: DeployLog[];
 };
 
 export type LatestDeployment = {
@@ -110,7 +142,8 @@ export type WebSocketLatestDeploymentsEvent = {
 export type WebSocketMessage =
   | WebSocketPingEvent
   | WebSocketPongEvent
-  | WebSocketLogsEvent
+  | WebSocketHttpLogsEvent
+  | WebSocketDeployLogsEvent
   | WebSocketLatestDeploymentsEvent;
 
 export type ClientWebSocketMessage = Exclude<
@@ -121,6 +154,7 @@ export type ClientWebSocketMessage = Exclude<
 export type EventNameToMessageMap<T extends ClientWebSocketEventName> = {
   ping: WebSocketPingEvent;
   pong: WebSocketPongEvent;
-  logs: WebSocketLogsEvent;
+  httpLogs: WebSocketHttpLogsEvent;
+  deployLogs: WebSocketDeployLogsEvent;
   latestDeployments: WebSocketLatestDeploymentsEvent;
 }[T];

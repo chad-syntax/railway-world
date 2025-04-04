@@ -19,7 +19,7 @@ export class Player extends WorldObject {
   public controls: PointerLockControls;
 
   private static readonly PLAYER_HEIGHT = 1.7; // Average human height in meters
-  private static readonly INTERACTION_DISTANCE = 10.0; // Maximum distance for interaction
+  private static readonly INTERACTION_DISTANCE = 5.0; // Maximum distance for interaction
 
   // Movement speeds
   private static readonly NORMAL_SPEED = 30.0;

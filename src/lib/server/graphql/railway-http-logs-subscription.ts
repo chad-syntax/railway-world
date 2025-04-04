@@ -1,4 +1,4 @@
-export const railwayHttpLogsSubscription = `
+export const RAILWAY_HTTP_LOGS_SUBSCRIPTION = `
 subscription streamHttplogs($deploymentId: String!, $filter: String, $beforeLimit: Int!, $beforeDate: String!, $anchorDate: String, $afterDate: String) {
   httpLogs(
     deploymentId: $deploymentId
