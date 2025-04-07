@@ -501,6 +501,7 @@ export const MOCK_LATEST_DEPLOYMENTS: LatestDeploymentsResponse = {
       edges: [
         {
           node: {
+            id: '46e21bf7-f12b-4995-ae51-9969d2113ed7',
             serviceInstances: {
               edges: [
                 {

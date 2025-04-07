@@ -54,20 +54,23 @@ export type Team = {
   avatar: string;
 };
 
-export type DeploymentStatus =
-  | 'BUILDING'
-  | 'CRASHED'
-  | 'DEPLOYING'
-  | 'FAILED'
-  | 'INITIALIZING'
-  | 'NEEDS_APPROVAL'
-  | 'QUEUED'
-  | 'REMOVED'
-  | 'REMOVING'
-  | 'SKIPPED'
-  | 'SLEEPING'
-  | 'SUCCESS'
-  | 'WAITING';
+export const DEPLOYMENT_STATUSES = {
+  BUILDING: 'BUILDING',
+  CRASHED: 'CRASHED',
+  DEPLOYING: 'DEPLOYING',
+  FAILED: 'FAILED',
+  INITIALIZING: 'INITIALIZING',
+  NEEDS_APPROVAL: 'NEEDS_APPROVAL',
+  QUEUED: 'QUEUED',
+  REMOVED: 'REMOVED',
+  REMOVING: 'REMOVING',
+  SKIPPED: 'SKIPPED',
+  SLEEPING: 'SLEEPING',
+  SUCCESS: 'SUCCESS',
+  WAITING: 'WAITING',
+} as const;
+
+export type DeploymentStatus = keyof typeof DEPLOYMENT_STATUSES;
 
 export type Deployment = {
   id: string;

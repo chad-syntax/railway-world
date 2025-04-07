@@ -5,7 +5,6 @@ import {
   RailwayData,
   HttpLog,
   LatestDeployment,
-  Service,
   DeployLog,
 } from '../types';
 import { GRAPHQL_WS_API_URL } from '../constants';
@@ -62,6 +61,15 @@ const getRailwayData = async (): Promise<RailwayData> => {
   return processedData;
 };
 
+type SendGqlSubscriptionsCommandOptions = {
+  environmentId: string;
+  serviceId: string;
+  deploymentId: string;
+  snapshotId: string;
+  isHttpService: boolean;
+  createdAt: string;
+};
+
 export class LiveDataService {
   // GQL WebSocket state
   private gqlWs: WebSocket | null = null;
@@ -77,6 +85,8 @@ export class LiveDataService {
   // Railway data state
   private initialRailwayDataPromise: Promise<RailwayData>;
   private initialRailwayDataAttempts: number = 0;
+  private logsCache: Map<string, HttpLog[] | DeployLog[]> = new Map();
+  private cachedSubscriptionOptions: SendGqlSubscriptionsCommandOptions[] = [];
 
   // Latest deployments polling state
   private latestDeployments: LatestDeployment[] | null = null;
@@ -158,6 +168,7 @@ export class LiveDataService {
     setTimeout(() => {
       // delayed check to stop listening for data, adding delay to allow for 1 client to refresh
       if (this.clientConnections.length === 0) {
+        console.log('no clients left, stopping listening for data');
         this.stopListeningForData();
       }
     }, 2000);
@@ -180,6 +191,20 @@ export class LiveDataService {
   private addConnection(socket: WebSocket.WebSocket) {
     if (this.clientConnections.length === 0) {
       this.startListeningForData();
+    }
+
+    for (const [id, logs] of this.logsCache.entries()) {
+      console.log('sending cached logs for new connection', id);
+      const isHttpLogs = id.startsWith('http-');
+
+      const eventName = isHttpLogs ? 'httpLogs' : 'deployLogs';
+      const deploymentId = id.replace('http-', '').replace('deploy-', '');
+
+      this.sendClientMessage(socket, {
+        eventName,
+        deploymentId,
+        logs,
+      } as WebSocketMessage);
     }
 
     this.clientConnections.push(socket);
@@ -208,25 +233,29 @@ export class LiveDataService {
     );
   };
 
-  private sendGqlSubscriptionsCommand = (options: {
-    environmentId: string;
-    service: Service;
-  }) => {
-    const { environmentId, service } = options;
-
-    const isHttpService = service.domains.length > 0;
+  private sendGqlSubscriptionsCommand = (
+    options: SendGqlSubscriptionsCommandOptions
+  ) => {
+    const {
+      environmentId,
+      serviceId,
+      deploymentId,
+      snapshotId,
+      isHttpService,
+      createdAt,
+    } = options;
 
     const subscriptionIds = new Set<string>();
 
     if (isHttpService) {
-      const httpSubscriptionId = `http-${service.latestDeployment.id}`;
+      const httpSubscriptionId = `http-${deploymentId}`;
       const httpLogsSubscribeMessage = {
         id: httpSubscriptionId,
         type: 'subscribe',
         payload: {
           query: RAILWAY_HTTP_LOGS_SUBSCRIPTION,
           variables: {
-            deploymentId: service.latestDeployment.id,
+            deploymentId,
             beforeLimit: 500,
             // do not fetch previous logs, only latest because of the real-time nature of the request visualization
             beforeDate: new Date().toISOString(),
@@ -241,9 +270,9 @@ export class LiveDataService {
       subscriptionIds.add(httpSubscriptionId);
     }
 
-    const deployLogsSubscriptionId = `deploy-${service.latestDeployment.id}`;
-    const beforeDate = service.latestDeployment.createdAt;
-    const filter = `(  ) @deployment:${service.latestDeployment.id} -@replica:${service.latestDeployment.snapshotId}`;
+    const deployLogsSubscriptionId = `deploy-${deploymentId}`;
+    const beforeDate = createdAt;
+    const filter = `(  ) @deployment:${deploymentId} -@replica:${snapshotId}`;
 
     const deployLogsSubscribeMessage = {
       id: deployLogsSubscriptionId,
@@ -265,7 +294,7 @@ export class LiveDataService {
 
     this.gqlWs!.send(JSON.stringify(deployLogsSubscribeMessage));
     this.gqlSubscriptions.add(deployLogsSubscriptionId);
-    this.gqlServiceSubscriptions.set(service.id, subscriptionIds);
+    this.gqlServiceSubscriptions.set(serviceId, subscriptionIds);
   };
 
   private unsubscribeFromDeployment = (deploymentId: string) => {
@@ -285,10 +314,24 @@ export class LiveDataService {
           this.initialRailwayDataPromise.then((initialRailwayData) => {
             console.log('initializing subscriptions');
 
+            // we overwrite this with the latest deployments and send the commands from there instead of initial data
+            if (this.cachedSubscriptionOptions.length !== 0) {
+              for (const options of this.cachedSubscriptionOptions) {
+                this.sendGqlSubscriptionsCommand(options);
+              }
+
+              return;
+            }
+
+            // we need to update something here on the class with latest deployments, otherwise this will subscribe to old deployments
             for (const service of initialRailwayData.services) {
               this.sendGqlSubscriptionsCommand({
                 environmentId: initialRailwayData.environmentId,
-                service,
+                serviceId: service.id,
+                deploymentId: service.latestDeployment.id,
+                snapshotId: service.latestDeployment.snapshotId,
+                isHttpService: service.domains.length > 0,
+                createdAt: service.latestDeployment.createdAt,
               });
             }
           });
@@ -298,6 +341,15 @@ export class LiveDataService {
           const httpLogs = message.payload.data.httpLogs as HttpLog[];
 
           if (message.id && httpLogs) {
+            const cachedLogs = this.logsCache.get(message.id);
+
+            if (cachedLogs) {
+              this.logsCache.set(
+                message.id,
+                (cachedLogs as HttpLog[]).concat(httpLogs).slice(-120)
+              );
+            }
+
             if (httpLogs.length > 0) {
               this.clientConnections.forEach((conn) => {
                 this.sendClientMessage(conn, {
@@ -308,10 +360,20 @@ export class LiveDataService {
               });
             }
           }
+
           const deployLogs = message?.payload?.data
             ?.environmentLogs as DeployLog[];
 
           if (message.id && deployLogs) {
+            const cachedLogs = this.logsCache.get(message.id);
+
+            if (cachedLogs) {
+              this.logsCache.set(
+                message.id,
+                (cachedLogs as DeployLog[]).concat(deployLogs).slice(-120)
+              );
+            }
+
             this.clientConnections.forEach((conn) => {
               this.sendClientMessage(conn, {
                 eventName: 'deployLogs',
@@ -348,7 +410,13 @@ export class LiveDataService {
       intentional: this.isIntentionalClose,
     });
 
-    if (this.gqlConnectAttempts < 3 && this.clientConnections.length > 0) {
+    // if socket closes and there are no clients, stop the gql subscription
+    if (this.clientConnections.length === 0) {
+      this.stopGqlSubscriptionForLogs();
+      return;
+    }
+
+    if (this.gqlConnectAttempts < 3) {
       console.log('Attempting to reconnect to Railway GQL WebSocket...');
       if (!this.isIntentionalClose && !isDeadlineExceeded) {
         this.gqlConnectAttempts++;
@@ -465,6 +533,9 @@ export class LiveDataService {
             latestDeployment.domains.serviceDomains.length > 0 ||
             latestDeployment.domains.customDomains.length > 0;
 
+          const isDeployed =
+            latestDeployment.latestDeployment.status === 'SUCCESS';
+
           if (isHttpService) {
             const httpSubscriptionId = `http-${latestDeployment.latestDeployment.id}`;
             if (!subscriptionIds.has(httpSubscriptionId)) {
@@ -475,8 +546,8 @@ export class LiveDataService {
               if (currentServiceHttpSubscription) {
                 this.unsubscribeFromDeployment(currentServiceHttpSubscription);
                 subscriptionIds.delete(currentServiceHttpSubscription);
+                this.logsCache.delete(currentServiceHttpSubscription);
               }
-              subscriptionIds.add(httpSubscriptionId);
             }
           }
 
@@ -492,11 +563,35 @@ export class LiveDataService {
             if (currentServiceDeploySubscription) {
               this.unsubscribeFromDeployment(currentServiceDeploySubscription);
               subscriptionIds.delete(currentServiceDeploySubscription);
+              this.logsCache.delete(currentServiceDeploySubscription);
             }
 
-            subscriptionIds.add(
-              `deploy-${latestDeployment.latestDeployment.id}`
-            );
+            const environmentId =
+              latestDeploymentsData.project.environments.edges[0].node.id;
+
+            const isHttpService =
+              latestDeployment.domains.serviceDomains.length > 0 ||
+              latestDeployment.domains.customDomains.length > 0;
+
+            if (isDeployed) {
+              this.cachedSubscriptionOptions =
+                this.cachedSubscriptionOptions.filter(
+                  (options) => options.serviceId !== latestDeployment.serviceId
+                );
+
+              const newOptions = {
+                environmentId,
+                serviceId: latestDeployment.serviceId,
+                deploymentId: latestDeployment.latestDeployment.id,
+                snapshotId: latestDeployment.latestDeployment.snapshotId,
+                isHttpService,
+                createdAt: latestDeployment.latestDeployment.createdAt,
+              };
+
+              this.cachedSubscriptionOptions.push(newOptions);
+
+              this.sendGqlSubscriptionsCommand(newOptions);
+            }
           }
         }
 
@@ -523,6 +618,7 @@ export class LiveDataService {
       this.gqlWs.close();
       this.gqlWs = null;
       this.gqlSubscriptions.clear();
+      this.isIntentionalClose = false;
       if (this.gqlReSubscribeTimeout) {
         clearTimeout(this.gqlReSubscribeTimeout);
         this.gqlReSubscribeTimeout = null;

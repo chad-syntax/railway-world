@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import { World } from './World';
 import { Position, WorldObject } from './WorldObject';
-import { breakTextIntoLines, processSourceText } from '../../utils';
+import {
+  breakTextIntoLines,
+  processSourceText,
+  formatTimestamp,
+} from '../../utils';
 import {
   Service,
   Deployment,
@@ -11,6 +15,7 @@ import {
   DeployLog,
   HttpLog,
   WebSocketHttpLogsEvent,
+  DEPLOYMENT_STATUSES,
 } from '../../types';
 import {
   SERVICE_NODEJS,
@@ -18,15 +23,10 @@ import {
   SERVICE_REDIS,
   SERVICE_POSTIZ,
   GRAY_3,
-  LIME_GREEN_HEX_STR,
   BLUE_HEX_STR,
-  RED_HEX_STR,
   GRAY_1_HEX_STR,
   WHITE_HEX_STR,
-  BLACK_HEX_STR,
   OFF_WHITE,
-  BLACK,
-  RED,
 } from '../../../lib/colors';
 
 const SERVICE_STRUCTURE_TYPE_COLORS: Record<string, number> = {
@@ -79,67 +79,63 @@ type ServiceStructureConstructorOptions = {
 };
 
 export class ServiceStructure extends WorldObject {
-  // Basic Properties
   public deployment: Deployment;
   public service: Service;
   public width: number = 3;
   public height: number = 3;
   public depth: number = 3;
 
-  // Core Mesh
+  private state: DeploymentStatus;
+
   private serviceStructure: THREE.Mesh;
   private serviceStructureColor: number;
 
-  // Icon Meshes
   private iconMesh: THREE.Mesh | null = null;
   private sourceIconMesh: THREE.Mesh | null = null;
 
-  // Text Meshes
   private sourceTextMesh: THREE.Mesh | null = null;
   private statusMesh: THREE.Mesh | null = null;
+  private outlineMesh: THREE.Mesh | null = null;
 
-  // Outline Mesh
-  private outlineMesh: THREE.Mesh | null = null; // Mesh for proximity outline
-
-  // Oscillating Opacity Animation
   private isOscillatingOpacity: boolean = false;
   private oscillatingOpacityDirection: boolean = true;
   private oscillatingOpacityState: number = 0.25;
-  private readonly OSCILLATING_OPACITY_SPEED = 0.5;
-  private readonly OSCILLATING_OPACITY_MIN = 0.25;
-  private readonly OSCILLATING_OPACITY_MAX = 0.9;
 
-  // Sleeping Animation
+  private static readonly OSCILLATING_OPACITY_SPEED = 0.5;
+  private static readonly OSCILLATING_OPACITY_MIN = 0.25;
+  private static readonly OSCILLATING_OPACITY_MAX = 0.9;
+
   private isSleepAnimating: boolean = false;
   private sleepingZs: THREE.Mesh[] = [];
   private nextZSpawnTime: number = 0;
-  private readonly Z_SPAWN_INTERVAL = 1.5; // Spawn a new Z every 2 seconds
-  private readonly Z_FLOAT_SPEED = 0.5; // Units per second
-  private readonly Z_GROW_SPEED = 0.5; // Scale increase per second
-  private readonly Z_MAX_SCALE = 3; // Maximum scale before Z disappears
-  private readonly Z_START_SCALE = 0; // Initial scale of Z
-  private readonly Z_COLOR = BLUE_HEX_STR; // Use the BLUE status color
 
-  // Fire Animation
+  private static readonly Z_SPAWN_INTERVAL = 1.5; // Spawn a new Z every 2 seconds
+  private static readonly Z_FLOAT_SPEED = 0.5; // Units per second
+  private static readonly Z_GROW_SPEED = 0.5; // Scale increase per second
+  private static readonly Z_MAX_SCALE = 3; // Maximum scale before Z disappears
+  private static readonly Z_START_SCALE = 0; // Initial scale of Z
+  private static readonly Z_COLOR = BLUE_HEX_STR; // Use the BLUE status color
+
   private isFireAnimating: boolean = false;
   private fireMeshes: THREE.Mesh[] = [];
   private fireTexture: THREE.Texture | null = null;
   private currentFireFrame: number = 0;
   private fireAnimationTime: number = 0;
-  private readonly FIRE_TEXTURE_SIZE = 1;
-  private readonly FIRE_FRAME_INTERVAL = 0.15; // 150ms between frames
-  private readonly TOTAL_FIRE_FRAMES = 32; // Total frames in spritesheet
-  private readonly FIRE_SPRITE_COLS = 8; // 8 columns
-  private readonly FIRE_SPRITE_ROWS = 4; // 4 rows
 
-  // Deploy Logs Panel
+  private static readonly FIRE_TEXTURE_SIZE = 1;
+  private static readonly FIRE_FRAME_INTERVAL = 0.15; // 150ms between frames
+  private static readonly TOTAL_FIRE_FRAMES = 32; // Total frames in spritesheet
+  private static readonly FIRE_SPRITE_COLS = 8; // 8 columns
+  private static readonly FIRE_SPRITE_ROWS = 4; // 4 rows
+
+  private static readonly MAX_LOGS = 120;
+
   private deployLogsPanel: THREE.Mesh | null = null;
   private deployLogsTexture: THREE.CanvasTexture | null = null;
   private deployLogsCanvas: HTMLCanvasElement | null = null;
   private deployLogsCtx: CanvasRenderingContext2D | null = null;
   private deployLogs: DeployLog[] = [];
 
-  // Http Logs Panel
   private httpLogsPanel: THREE.Mesh | null = null;
   private httpLogsTexture: THREE.CanvasTexture | null = null;
   private httpLogsCanvas: HTMLCanvasElement | null = null;
@@ -153,6 +149,7 @@ export class ServiceStructure extends WorldObject {
 
     this.service = service;
     this.deployment = deployment;
+    this.state = deployment.status;
 
     // Get color based on service type
     this.serviceStructureColor =
@@ -181,7 +178,6 @@ export class ServiceStructure extends WorldObject {
       z: 0,
     });
 
-    // Add serviceStructure and name to group
     this.group.add(this.serviceStructure);
 
     // Create the outline mesh
@@ -209,7 +205,7 @@ export class ServiceStructure extends WorldObject {
     }
 
     // add deployment info at the top of the front face of the serviceStructure
-    this.addDeploymentInfo(this.deployment);
+    this.addDeploymentInfo();
 
     this.addSvcLabel();
 
@@ -386,10 +382,7 @@ export class ServiceStructure extends WorldObject {
     if (deploymentId === this.deployment.id && logs.length > 0) {
       this.deployLogs.push(...logs);
 
-      // Keep only the latest 100 logs in memory
-      if (this.deployLogs.length > 120) {
-        this.deployLogs = this.deployLogs.slice(-120);
-      }
+      this.deployLogs = this.deployLogs.slice(-ServiceStructure.MAX_LOGS);
 
       // Update the texture on the panel
       this.updateDeployLogsTexture();
@@ -402,10 +395,7 @@ export class ServiceStructure extends WorldObject {
     if (deploymentId === this.deployment.id && logs.length > 0) {
       this.httpLogs.push(...logs);
 
-      // Keep only the latest 100 logs in memory
-      if (this.httpLogs.length > 120) {
-        this.httpLogs = this.httpLogs.slice(-120);
-      }
+      this.httpLogs = this.httpLogs.slice(-ServiceStructure.MAX_LOGS);
 
       this.updateHttpLogsTexture();
     }
@@ -445,15 +435,7 @@ export class ServiceStructure extends WorldObject {
       for (let i = this.httpLogs.length - 1; i >= 0; i--) {
         const log = this.httpLogs[i];
 
-        // Format timestamp (e.g., "Mar 31 17:46:40")
-        const timestamp = new Date(log.timestamp).toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        });
+        const timestamp = formatTimestamp(log.timestamp);
 
         const emoji =
           log.httpStatus >= 500 ? '🟥' : log.httpStatus >= 400 ? '🟨' : '🟩';
@@ -486,7 +468,6 @@ export class ServiceStructure extends WorldObject {
     const canvas = this.deployLogsCanvas;
 
     // Clear canvas with a black background
-    // ctx.fillStyle = RED_HEX_STR; // Black background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Set text style
@@ -520,14 +501,7 @@ export class ServiceStructure extends WorldObject {
           LOG_SEVERITY_EMOJI[severity] || LOG_SEVERITY_EMOJI.default;
 
         // Format timestamp (e.g., "Mar 31 17:46:40")
-        const timestamp = new Date(log.timestamp).toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        });
+        const timestamp = formatTimestamp(log.timestamp);
 
         const logLine = `${emoji} | ${timestamp} | ${log.message}`;
 
@@ -580,68 +554,16 @@ export class ServiceStructure extends WorldObject {
     });
   };
 
-  private addDeploymentInfo(deployment: Deployment): void {
-    const deploymentStatus = deployment.status;
-
-    const structureMaterial = this.serviceStructure
-      .material as THREE.MeshStandardMaterial;
-
-    // Determine text color based on status
-    let textColor;
-    switch (deploymentStatus) {
-      case 'SUCCESS':
-        textColor = LIME_GREEN_HEX_STR; // Green
-        break;
-      case 'SLEEPING':
-        textColor = BLUE_HEX_STR; // Blue (was sleeping/yellow)
-        break;
-      case 'FAILED':
-      case 'CRASHED':
-        textColor = RED_HEX_STR; // Red
-        break;
-      default:
-        textColor = GRAY_1_HEX_STR; // Gray (was default/blue)
-    }
-
-    // TODO clean this up
-    if (deploymentStatus === 'FAILED' || deploymentStatus === 'CRASHED') {
-      this.isFireAnimating = true;
-      this.isOscillatingOpacity = false;
-      this.isSleepAnimating = false;
-      structureMaterial.opacity = 1;
-      this.createFireMeshes();
-    } else if (deploymentStatus === 'SLEEPING') {
-      this.isSleepAnimating = true;
-      this.isOscillatingOpacity = false;
-      this.isFireAnimating = false;
-      structureMaterial.opacity = 1;
-    } else if (
-      deploymentStatus === 'BUILDING' ||
-      deploymentStatus === 'INITIALIZING' ||
-      deploymentStatus === 'DEPLOYING' ||
-      deploymentStatus === 'WAITING'
-    ) {
-      this.isOscillatingOpacity = true;
-      structureMaterial.transparent = true;
-      this.isSleepAnimating = false;
-      this.isFireAnimating = false;
-    } else {
-      this.isOscillatingOpacity = false;
-      this.isSleepAnimating = false;
-      this.isFireAnimating = false;
-      this.removeFireMeshes();
-      structureMaterial.opacity = 1;
-      structureMaterial.transparent = false;
-    }
+  private addDeploymentInfo() {
+    this.stateAnimations[this.state]();
 
     const { texture } = this.createTextTexture(
-      `${DEPLOYMENT_STATUS_EMOJI[deploymentStatus]} ${deploymentStatus}`,
+      `${DEPLOYMENT_STATUS_EMOJI[this.state]} ${this.state}`,
       {
         fontSize: 96,
         canvasWidth: 1024,
         canvasHeight: 256,
         strokeWidth: 12,
-        strokeColor: BLACK_HEX_STR,
       }
     );
 
@@ -666,14 +588,86 @@ export class ServiceStructure extends WorldObject {
     this.group.add(this.statusMesh);
   }
 
+  private setBaseAnimation = (): void => {
+    this.isOscillatingOpacity = false;
+    this.isSleepAnimating = false;
+    this.isFireAnimating = false;
+
+    const structureMaterial = this.serviceStructure
+      .material as THREE.MeshStandardMaterial;
+
+    structureMaterial.opacity = 1;
+    structureMaterial.transparent = false;
+
+    this.removeFireMeshes();
+    this.removeSleepMeshes();
+  };
+
+  private setPendingAnimation = (): void => {
+    this.setBaseAnimation();
+
+    const structureMaterial = this.serviceStructure
+      .material as THREE.MeshStandardMaterial;
+
+    structureMaterial.transparent = true;
+
+    this.isOscillatingOpacity = true;
+  };
+
+  private setSleepAnimation = (): void => {
+    this.setBaseAnimation();
+
+    this.isSleepAnimating = true;
+  };
+
+  private setFireAnimation = (): void => {
+    this.setBaseAnimation();
+
+    this.isFireAnimating = true;
+
+    this.createFireMeshes();
+  };
+
+  private readonly stateAnimations = {
+    [DEPLOYMENT_STATUSES.BUILDING]: this.setPendingAnimation,
+    [DEPLOYMENT_STATUSES.INITIALIZING]: this.setPendingAnimation,
+    [DEPLOYMENT_STATUSES.DEPLOYING]: this.setPendingAnimation,
+    [DEPLOYMENT_STATUSES.WAITING]: this.setPendingAnimation,
+    [DEPLOYMENT_STATUSES.CRASHED]: this.setFireAnimation,
+    [DEPLOYMENT_STATUSES.FAILED]: this.setFireAnimation,
+    [DEPLOYMENT_STATUSES.SLEEPING]: this.setSleepAnimation,
+    [DEPLOYMENT_STATUSES.NEEDS_APPROVAL]: this.setBaseAnimation,
+    [DEPLOYMENT_STATUSES.QUEUED]: this.setBaseAnimation,
+    [DEPLOYMENT_STATUSES.REMOVED]: this.setBaseAnimation,
+    [DEPLOYMENT_STATUSES.REMOVING]: this.setBaseAnimation,
+    [DEPLOYMENT_STATUSES.SKIPPED]: this.setBaseAnimation,
+    [DEPLOYMENT_STATUSES.SUCCESS]: this.setBaseAnimation,
+  };
+
   public updateDeployment(deployment: Deployment) {
     this.deployment = deployment;
+    const previousState = this.state;
+    this.state = deployment.status;
 
     if (this.statusMesh) {
       this.group.remove(this.statusMesh);
     }
 
-    this.addDeploymentInfo(deployment);
+    if (
+      previousState === DEPLOYMENT_STATUSES.SUCCESS &&
+      (deployment.status === 'INITIALIZING' ||
+        deployment.status === 'DEPLOYING')
+    ) {
+      console.log('resetting logs');
+
+      this.deployLogs = [];
+      this.httpLogs = [];
+
+      this.updateDeployLogsTexture();
+      this.updateHttpLogsTexture();
+    }
+
+    this.addDeploymentInfo();
   }
 
   private addServiceIcon(iconUrl: string): void {
@@ -737,7 +731,7 @@ export class ServiceStructure extends WorldObject {
       fontSize: 80,
       canvasWidth: 128,
       canvasHeight: 128,
-      color: this.Z_COLOR,
+      color: ServiceStructure.Z_COLOR,
       strokeColor: WHITE_HEX_STR,
       strokeWidth: 4,
     });
@@ -758,7 +752,11 @@ export class ServiceStructure extends WorldObject {
     mesh.userData.ignoreInteraction = true;
 
     mesh.position.set(this.width / 2 - 0.5, this.height, this.depth / 2 - 0.5);
-    mesh.scale.set(this.Z_START_SCALE, this.Z_START_SCALE, this.Z_START_SCALE);
+    mesh.scale.set(
+      ServiceStructure.Z_START_SCALE,
+      ServiceStructure.Z_START_SCALE,
+      ServiceStructure.Z_START_SCALE
+    );
 
     return mesh;
   }
@@ -874,16 +872,21 @@ export class ServiceStructure extends WorldObject {
     this.oscillatingOpacityState =
       this.oscillatingOpacityState +
       delta *
-        this.OSCILLATING_OPACITY_SPEED *
+        ServiceStructure.OSCILLATING_OPACITY_SPEED *
         (this.oscillatingOpacityDirection ? 1 : -1);
 
-    if (this.oscillatingOpacityState > this.OSCILLATING_OPACITY_MAX) {
+    if (
+      this.oscillatingOpacityState > ServiceStructure.OSCILLATING_OPACITY_MAX
+    ) {
       this.oscillatingOpacityDirection = false;
-    } else if (this.oscillatingOpacityState < this.OSCILLATING_OPACITY_MIN) {
+    } else if (
+      this.oscillatingOpacityState < ServiceStructure.OSCILLATING_OPACITY_MIN
+    ) {
       this.oscillatingOpacityDirection = true;
     }
 
     structureMaterial.opacity = this.oscillatingOpacityState;
+    structureMaterial.needsUpdate = true;
   }
 
   private updateSleepAnimation(delta: number): void {
@@ -895,7 +898,8 @@ export class ServiceStructure extends WorldObject {
       this.group.add(zMesh);
 
       // Set next spawn time
-      this.nextZSpawnTime = Date.now() + this.Z_SPAWN_INTERVAL * 1000;
+      this.nextZSpawnTime =
+        Date.now() + ServiceStructure.Z_SPAWN_INTERVAL * 1000;
     }
 
     // Update each Z particle
@@ -903,25 +907,32 @@ export class ServiceStructure extends WorldObject {
       const z = this.sleepingZs[i];
 
       // Move upward
-      z.position.y += this.Z_FLOAT_SPEED * delta;
+      z.position.y += ServiceStructure.Z_FLOAT_SPEED * delta;
 
       // Grow in size
-      const newScale = z.scale.x + this.Z_GROW_SPEED * delta;
+      const newScale = z.scale.x + ServiceStructure.Z_GROW_SPEED * delta;
       z.scale.set(newScale, newScale, newScale);
 
       // Fade out as it grows
       const material = z.material as THREE.MeshBasicMaterial;
       material.opacity =
         1 -
-        (newScale - this.Z_START_SCALE) /
-          (this.Z_MAX_SCALE - this.Z_START_SCALE);
+        (newScale - ServiceStructure.Z_START_SCALE) /
+          (ServiceStructure.Z_MAX_SCALE - ServiceStructure.Z_START_SCALE);
 
       // Remove if it's grown too large
-      if (newScale >= this.Z_MAX_SCALE) {
+      if (newScale >= ServiceStructure.Z_MAX_SCALE) {
         this.group.remove(z);
         this.sleepingZs.splice(i, 1);
       }
     }
+  }
+
+  private removeSleepMeshes(): void {
+    this.sleepingZs.forEach((z) => {
+      this.group.remove(z);
+    });
+    this.sleepingZs = [];
   }
 
   private createFireMeshes(): void {
@@ -940,28 +951,28 @@ export class ServiceStructure extends WorldObject {
         // Create fire planes for each side of the cube
         const positions = [
           // Front face fires
-          { x: -this.FIRE_TEXTURE_SIZE / 1.5, z: this.depth / 2 },
-          { x: this.FIRE_TEXTURE_SIZE / 1.5, z: this.depth / 2 },
+          { x: -ServiceStructure.FIRE_TEXTURE_SIZE / 1.5, z: this.depth / 2 },
+          { x: ServiceStructure.FIRE_TEXTURE_SIZE / 1.5, z: this.depth / 2 },
           // Back face fires
-          { x: -this.FIRE_TEXTURE_SIZE / 1.5, z: -this.depth / 2 },
-          { x: this.FIRE_TEXTURE_SIZE / 1.5, z: -this.depth / 2 },
+          { x: -ServiceStructure.FIRE_TEXTURE_SIZE / 1.5, z: -this.depth / 2 },
+          { x: ServiceStructure.FIRE_TEXTURE_SIZE / 1.5, z: -this.depth / 2 },
           // Right side fires
-          { x: this.width / 2, z: -this.FIRE_TEXTURE_SIZE / 1.5 },
-          { x: this.width / 2, z: this.FIRE_TEXTURE_SIZE / 1.5 },
+          { x: this.width / 2, z: -ServiceStructure.FIRE_TEXTURE_SIZE / 1.5 },
+          { x: this.width / 2, z: ServiceStructure.FIRE_TEXTURE_SIZE / 1.5 },
           // Left side fires
-          { x: -this.width / 2, z: -this.FIRE_TEXTURE_SIZE / 1.5 },
-          { x: -this.width / 2, z: this.FIRE_TEXTURE_SIZE / 1.5 },
+          { x: -this.width / 2, z: -ServiceStructure.FIRE_TEXTURE_SIZE / 1.5 },
+          { x: -this.width / 2, z: ServiceStructure.FIRE_TEXTURE_SIZE / 1.5 },
         ];
 
         positions.forEach(({ x, z }) => {
           const fireGeometry = new THREE.PlaneGeometry(
-            this.FIRE_TEXTURE_SIZE,
-            this.FIRE_TEXTURE_SIZE
+            ServiceStructure.FIRE_TEXTURE_SIZE,
+            ServiceStructure.FIRE_TEXTURE_SIZE
           );
 
           // Update UV coordinates for the first frame
-          const frameWidth = 1 / this.FIRE_SPRITE_COLS;
-          const frameHeight = 1 / this.FIRE_SPRITE_ROWS;
+          const frameWidth = 1 / ServiceStructure.FIRE_SPRITE_COLS;
+          const frameHeight = 1 / ServiceStructure.FIRE_SPRITE_ROWS;
           const uvs = fireGeometry.attributes.uv;
           const frameX = 0;
           const frameY = 0; // Start from top row
@@ -985,7 +996,11 @@ export class ServiceStructure extends WorldObject {
           const fireMesh = new THREE.Mesh(fireGeometry, fireMaterial);
 
           // Position the fire slightly above the cube
-          fireMesh.position.set(x, this.height + this.FIRE_TEXTURE_SIZE / 2, z);
+          fireMesh.position.set(
+            x,
+            this.height + ServiceStructure.FIRE_TEXTURE_SIZE / 2,
+            z
+          );
 
           // Rotate the fire to face outward from the center
           if (Math.abs(x) === this.width / 2) {
@@ -1008,16 +1023,18 @@ export class ServiceStructure extends WorldObject {
     if (!this.isFireAnimating || !this.fireTexture) return;
 
     this.fireAnimationTime += delta;
-    if (this.fireAnimationTime >= this.FIRE_FRAME_INTERVAL) {
+    if (this.fireAnimationTime >= ServiceStructure.FIRE_FRAME_INTERVAL) {
       this.fireAnimationTime = 0;
       this.currentFireFrame =
-        (this.currentFireFrame + 1) % this.TOTAL_FIRE_FRAMES;
+        (this.currentFireFrame + 1) % ServiceStructure.TOTAL_FIRE_FRAMES;
 
       // Calculate the frame position in the spritesheet grid
-      const frameX = this.currentFireFrame % this.FIRE_SPRITE_COLS;
-      const frameY = Math.floor(this.currentFireFrame / this.FIRE_SPRITE_COLS);
-      const frameWidth = 1 / this.FIRE_SPRITE_COLS;
-      const frameHeight = 1 / this.FIRE_SPRITE_ROWS;
+      const frameX = this.currentFireFrame % ServiceStructure.FIRE_SPRITE_COLS;
+      const frameY = Math.floor(
+        this.currentFireFrame / ServiceStructure.FIRE_SPRITE_COLS
+      );
+      const frameWidth = 1 / ServiceStructure.FIRE_SPRITE_COLS;
+      const frameHeight = 1 / ServiceStructure.FIRE_SPRITE_ROWS;
 
       // Update UV coordinates for all fire meshes
       this.fireMeshes.forEach((mesh) => {

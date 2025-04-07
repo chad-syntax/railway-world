@@ -2,36 +2,13 @@ import { Service, HttpLog } from '../../types';
 import {
   BoxGeometry,
   Mesh,
-  CanvasTexture,
   MeshStandardMaterial,
-  LinearFilter,
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
 import { Position, WorldObject } from './WorldObject';
 import { World } from './World';
-import {
-  // STATUS_SUCCESS,
-  // STATUS_WARNING,
-  // STATUS_ERROR_LIGHT,
-  // STATUS_ERROR,
-  // STATUS_NEUTRAL,
-  // UI_WHITE_HEX,
-  // STATUS_SUCCESS_HEX,
-  // STATUS_WARNING_HEX,
-  // STATUS_ERROR_HEX,
-  // STATUS_ERROR_LIGHT_HEX,
-  // STATUS_NEUTRAL_HEX,
-  GREEN,
-  ORANGE,
-  RED,
-  GRAY_3,
-  WHITE_HEX_STR,
-  GREEN_HEX_STR,
-  ORANGE_HEX_STR,
-  RED_HEX_STR,
-  GRAY_3_HEX_STR,
-} from '../../../lib/colors';
+import { GREEN, ORANGE, RED, GRAY_3 } from '../../../lib/colors';
 
 type RequestBlockOptions = {
   service: Service;
@@ -96,13 +73,13 @@ export class RequestBlock extends WorldObject {
 
     // Calculate cube size based on tx and rx bytes
     const totalBytes = (this.log.txBytes || 0) + (this.log.rxBytes || 0);
-    // Normalize bytes to a reasonable cube size (0.02 units per 100 bytes, with min and max sizes)
+    // Normalize bytes to a reasonable cube size (0.02 units per 1000 bytes, with min and max sizes)
     const baseSize = 0.1;
-    const bytesScale = Math.min(Math.max(totalBytes / 1000, baseSize), 3);
+    const bytesScale = Math.min(Math.max(totalBytes / 10000, baseSize), 3);
     this.cubeSize = baseSize + bytesScale * 0.25 + Math.random() * 0.05;
 
     // Invert speed calculation - shorter durations move faster
-    this.speed = Math.min(Math.max(100 / (log.totalDuration || 1), 0.8), 8);
+    this.speed = Math.min(Math.max(50 / (log.totalDuration || 1), 0.8), 10);
 
     this.createBlock();
 
@@ -160,23 +137,17 @@ export class RequestBlock extends WorldObject {
     // Choose color based on HTTP status code
     const status = this.log.httpStatus;
     let baseColor;
-    let baseColorHex;
 
     if (status >= 200 && status < 300) {
       baseColor = GREEN; // Green for 2xx (success)
-      baseColorHex = GREEN_HEX_STR;
     } else if (status >= 300 && status < 400) {
       baseColor = ORANGE; // Orange for 3xx (redirection)
-      baseColorHex = ORANGE_HEX_STR;
     } else if (status >= 400 && status < 500) {
       baseColor = RED; // Red for 4xx (client errors) - Consolidated
-      baseColorHex = RED_HEX_STR;
     } else if (status >= 500) {
       baseColor = RED; // Red for 5xx (server errors) - Consolidated
-      baseColorHex = RED_HEX_STR;
     } else {
       baseColor = GRAY_3; // Gray for unknown status codes
-      baseColorHex = GRAY_3_HEX_STR;
     }
 
     // Create the main cube with solid color

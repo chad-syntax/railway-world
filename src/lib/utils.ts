@@ -80,3 +80,13 @@ export function processSourceText(text: string): string {
 
 export const wait = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+export const formatTimestamp = (timestamp: string) =>
+  new Date(timestamp).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });

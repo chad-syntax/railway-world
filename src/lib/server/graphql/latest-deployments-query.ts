@@ -7,6 +7,7 @@ query LatestDeployments($id: String!) {
     environments {
       edges {
         node {
+          id
           serviceInstances {
             edges {
               node {
@@ -41,6 +42,7 @@ export type LatestDeploymentsResponse = {
     environments: {
       edges: {
         node: {
+          id: string;
           serviceInstances: {
             edges: {
               node: {
