@@ -544,7 +544,6 @@ export class LiveDataService {
               ).find((id) => id.startsWith('http-'));
 
               if (currentServiceHttpSubscription) {
-                this.unsubscribeFromDeployment(currentServiceHttpSubscription);
                 subscriptionIds.delete(currentServiceHttpSubscription);
                 this.logsCache.delete(currentServiceHttpSubscription);
               }
@@ -561,7 +560,6 @@ export class LiveDataService {
             ).find((id) => id.startsWith('deploy-'));
 
             if (currentServiceDeploySubscription) {
-              this.unsubscribeFromDeployment(currentServiceDeploySubscription);
               subscriptionIds.delete(currentServiceDeploySubscription);
               this.logsCache.delete(currentServiceDeploySubscription);
             }
