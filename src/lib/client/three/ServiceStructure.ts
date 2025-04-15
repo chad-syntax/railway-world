@@ -668,8 +668,6 @@ export class ServiceStructure extends WorldObject {
       (deployment.status === 'INITIALIZING' ||
         deployment.status === 'DEPLOYING')
     ) {
-      console.log('resetting logs');
-
       this.deployLogs = [];
       this.httpLogs = [];
 

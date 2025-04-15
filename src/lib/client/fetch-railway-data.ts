@@ -14,7 +14,7 @@ export const fetchRailwayData = async (): Promise<RailwayDataResponse> => {
   const res = await retry(
     async () => {
       // if anything throws, we retry
-      const response = await fetch(`/api/railway-data`, {
+      const response = await fetch('/api/railway-data', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
