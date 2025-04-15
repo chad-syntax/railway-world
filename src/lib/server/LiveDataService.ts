@@ -236,6 +236,8 @@ export class LiveDataService {
   private sendGqlSubscriptionsCommand = (
     options: SendGqlSubscriptionsCommandOptions
   ) => {
+    if (isMockDataMode) return;
+
     const {
       environmentId,
       serviceId,
