@@ -1,3 +1,5 @@
+[![Follow on X](https://img.shields.io/twitter/follow/chad_syntax?style=social&logo=twitter)](https://x.com/chad_syntax)
+
 # Railway World
 
 A 3D interactive visualization tool for Railway infrastructure. This application renders your Railway services as structures in a Minecraft-inspired world and visualizes network traffic between services in real-time.
@@ -55,7 +57,10 @@ cp .env.example .env
 ```bash
 RAILWAY_WORLD_TOKEN="your-railway-token"
 RAILWAY_WORLD_PROJECT_ID="your-railway-project-id"
+MOCK_DATA="false"
 ```
+
+The `MOCK_DATA` environment variable can be set to `"true"` to use mock data instead of making real API calls to Railway. This is useful for development and testing without hitting the Railway APIs.
 
 4. Start the development server (both backend and frontend)
 
@@ -65,7 +70,7 @@ npm run dev
 
 4. Open your browser and navigate to `http://localhost:5173`
 
-5. Enter your Railway API token and project ID in the configuration panel
+5. The 3D visualization will load automatically using your configured environment variables
 
 ## Controls
 
@@ -81,6 +86,7 @@ The application consists of:
 
 1. **Frontend Client**: Three.js-based 3D visualization
 2. **Backend Server**: Fastify server that communicates with Railway's GraphQL API
+3. **Railway GraphQL APIs**: Outside API dependency for fetching Railway App data
 
 ### Project Structure
 
