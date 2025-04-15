@@ -163,7 +163,6 @@ export class VolumeStructure extends WorldObject {
       // Use appropriate texture filtering
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
-      texture.anisotropy = this.world.maxAnisotropy;
 
       const iconSize = Math.min(this.width, this.height) * 0.5;
       const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);

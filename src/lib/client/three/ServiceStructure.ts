@@ -87,8 +87,8 @@ export class ServiceStructure extends WorldObject {
 
   private state: DeploymentStatus;
 
-  private serviceStructure: THREE.Mesh;
-  private serviceStructureColor: number;
+  private serviceStructure!: THREE.Mesh;
+  private serviceStructureColor!: number;
 
   private iconMesh: THREE.Mesh | null = null;
   private sourceIconMesh: THREE.Mesh | null = null;
@@ -151,26 +151,7 @@ export class ServiceStructure extends WorldObject {
     this.deployment = deployment;
     this.state = deployment.status;
 
-    // Get color based on service type
-    this.serviceStructureColor =
-      SERVICE_STRUCTURE_TYPE_COLORS[
-        this.service.name.toLowerCase() as ServiceStructureTypeColors
-      ] || SERVICE_STRUCTURE_TYPE_COLORS.default;
-
-    // Create serviceStructure geometry
-    const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
-    const material = new THREE.MeshStandardMaterial({
-      color: this.serviceStructureColor,
-      roughness: 0.4, // Reduced roughness for more vibrant appearance
-      metalness: 0.25, // Slightly increased metalness
-      emissive: new THREE.Color(this.serviceStructureColor).multiplyScalar(0.1), // Slight glow matching serviceStructure color
-    });
-
-    this.serviceStructure = new THREE.Mesh(geometry, material);
-    this.serviceStructure.position.set(0, this.height / 2, 0);
-    this.serviceStructure.castShadow = true;
-    this.serviceStructure.receiveShadow = true;
-    this.serviceStructure.renderOrder = 0; // Base render order
+    this.createStructureMesh();
 
     this.createLabel(this.name, {
       x: 0,
@@ -178,21 +159,7 @@ export class ServiceStructure extends WorldObject {
       z: 0,
     });
 
-    this.group.add(this.serviceStructure);
-
-    // Create the outline mesh
-    const outlineGeometry = geometry.clone();
-    const outlineMaterial = new THREE.MeshBasicMaterial({
-      color: OFF_WHITE,
-      side: THREE.BackSide, // Render only the back faces
-      transparent: false,
-    });
-    this.outlineMesh = new THREE.Mesh(outlineGeometry, outlineMaterial);
-    this.outlineMesh.position.copy(this.serviceStructure.position); // Match position
-    this.outlineMesh.scale.multiplyScalar(1.01); // Slightly larger
-    this.outlineMesh.visible = false; // Initially hidden
-    this.outlineMesh.renderOrder = -1; // Render before the main structure
-    this.group.add(this.outlineMesh);
+    this.createOutlineMesh();
 
     // Create and add the icon to the front face if an icon URL is provided
     if (this.service.icon) {
@@ -226,6 +193,49 @@ export class ServiceStructure extends WorldObject {
     );
 
     this.world.wsClient.onMessage('deployLogs', this.handleDeployLogs);
+  }
+
+  private createStructureMesh(): void {
+    this.serviceStructureColor =
+      SERVICE_STRUCTURE_TYPE_COLORS[
+        this.service.name.toLowerCase() as ServiceStructureTypeColors
+      ] || SERVICE_STRUCTURE_TYPE_COLORS.default;
+
+    // Create serviceStructure geometry
+    const geometry = new THREE.BoxGeometry(this.width, this.height, this.depth);
+    const material = new THREE.MeshStandardMaterial({
+      color: this.serviceStructureColor,
+      roughness: 0.4, // Reduced roughness for more vibrant appearance
+      metalness: 0.25, // Slightly increased metalness
+      emissive: new THREE.Color(this.serviceStructureColor).multiplyScalar(0.1), // Slight glow matching serviceStructure color
+    });
+
+    this.serviceStructure = new THREE.Mesh(geometry, material);
+    this.serviceStructure.position.set(0, this.height / 2, 0);
+    this.serviceStructure.castShadow = true;
+    this.serviceStructure.receiveShadow = true;
+    this.serviceStructure.renderOrder = 0; // Base render order
+
+    this.group.add(this.serviceStructure);
+  }
+
+  private createOutlineMesh(): void {
+    const outlineGeometry = new THREE.BoxGeometry(
+      this.width,
+      this.height,
+      this.depth
+    );
+    const outlineMaterial = new THREE.MeshBasicMaterial({
+      color: OFF_WHITE,
+      side: THREE.BackSide, // Render only the back faces
+      transparent: false,
+    });
+    this.outlineMesh = new THREE.Mesh(outlineGeometry, outlineMaterial);
+    this.outlineMesh.position.copy(this.serviceStructure.position); // Match position
+    this.outlineMesh.scale.multiplyScalar(1.01); // Slightly larger
+    this.outlineMesh.visible = false; // Initially hidden
+    this.outlineMesh.renderOrder = -1; // Render before the main structure
+    this.group.add(this.outlineMesh);
   }
 
   private createHttpLogsPanel(): void {
@@ -676,7 +686,6 @@ export class ServiceStructure extends WorldObject {
 
     // Load the icon as a texture
     const textureLoader = new THREE.TextureLoader();
-    textureLoader.setCrossOrigin('anonymous');
 
     textureLoader.load(
       proxiedIconUrl,
@@ -831,7 +840,6 @@ export class ServiceStructure extends WorldObject {
 
     // Load the icon as a texture
     const textureLoader = new THREE.TextureLoader();
-    textureLoader.setCrossOrigin('anonymous');
 
     textureLoader.load(
       proxiedIconUrl,

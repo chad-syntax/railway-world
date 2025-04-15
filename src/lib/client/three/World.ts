@@ -25,6 +25,10 @@ import {
   YELLOW,
 } from '../../../lib/colors';
 import { Player } from './Player';
+import {
+  determineServicePositions,
+  ServicePosition,
+} from '../determine-service-positions';
 
 type WorldConstructorOptions = {
   htmlRoot: HTMLElement;
@@ -272,6 +276,20 @@ export class World {
   public populate() {
     console.log(JSON.stringify(this.railwayData, null, 2));
 
+    this.populateBillboards();
+
+    const servicePositions = determineServicePositions(
+      this.railwayData.services
+    );
+
+    this.populateServiceStructures(servicePositions);
+
+    this.populateConnections(this.railwayData.services);
+
+    this.populated = true;
+  }
+
+  private populateBillboards() {
     // Create the billboard
     const billboard = new ProjectBillboard({
       name: 'MainBillboard',
@@ -299,10 +317,9 @@ export class World {
     });
 
     this.addObject(authorBillboard);
+  }
 
-    const servicePositions = this.determineServicePositions();
-
-    // Combined loop to create serviceStructures, volumes, globes and handle connections
+  private populateServiceStructures(servicePositions: ServicePosition[]) {
     servicePositions.forEach((servicePosition) => {
       const { service, x, z } = servicePosition;
 
@@ -377,8 +394,10 @@ export class World {
         this.createConnectionBetween(globe, serviceStructure);
       }
     });
+  }
 
-    this.railwayData.services.forEach((service) => {
+  private populateConnections(services: Service[]) {
+    services.forEach((service) => {
       if (service.connections && service.connections.length > 0) {
         for (const targetServiceId of service.connections) {
           const startPointObject = this.serviceStructures.get(service.id);
@@ -393,136 +412,7 @@ export class World {
         }
       }
     });
-
-    this.populated = true;
   }
-
-  private determineServicePositions = () => {
-    const MIN_DISTANCE = 6; // 3 units structure + 3 units spacing
-    const occupiedPositions = new Set<string>();
-    const servicePositions: Array<{ service: Service; x: number; z: number }> =
-      [];
-
-    // Helper to check if a position is available
-    const isPositionAvailable = (x: number, z: number): boolean => {
-      const key = `${Math.round(x)},${Math.round(z)}`;
-      return !occupiedPositions.has(key);
-    };
-
-    // Helper to mark a position as occupied
-    const markPosition = (x: number, z: number) => {
-      const key = `${Math.round(x)},${Math.round(z)}`;
-      occupiedPositions.add(key);
-    };
-
-    // Calculate number of connections for each service
-    const connectionCounts = new Map<string, number>();
-    this.railwayData.services.forEach((service) => {
-      connectionCounts.set(service.id, (service.connections || []).length);
-    });
-
-    // Sort services by connection count (hubs first)
-    const sortedServices = [...this.railwayData.services].sort((a, b) => {
-      return (
-        (connectionCounts.get(b.id) || 0) - (connectionCounts.get(a.id) || 0)
-      );
-    });
-
-    // Place first hub at origin
-    if (sortedServices.length > 0) {
-      servicePositions.push({
-        service: sortedServices[0],
-        x: 0,
-        z: 0,
-      });
-      markPosition(0, 0);
-    }
-
-    // Helper to get available position around a center point
-    const findAvailablePosition = (
-      centerX: number,
-      centerZ: number,
-      radius: number
-    ): { x: number; z: number } | null => {
-      // Define positions in grid pattern - cardinal directions first, then diagonals
-      const positions = [
-        { x: centerX + radius, z: centerZ }, // right
-        { x: centerX, z: centerZ + radius }, // down
-        { x: centerX - radius, z: centerZ }, // left
-        { x: centerX, z: centerZ - radius }, // up
-        { x: centerX + radius, z: centerZ + radius }, // right-down
-        { x: centerX - radius, z: centerZ + radius }, // left-down
-        { x: centerX - radius, z: centerZ - radius }, // left-up
-        { x: centerX + radius, z: centerZ - radius }, // right-up
-      ];
-
-      for (const pos of positions) {
-        if (isPositionAvailable(pos.x, pos.z)) {
-          return pos;
-        }
-      }
-      return null;
-    };
-
-    // Place remaining services
-    for (let i = 1; i < sortedServices.length; i++) {
-      const service = sortedServices[i];
-      const connections = service.connections || [];
-
-      // Find connected services that are already placed
-      const connectedPositions = connections
-        .map((id) => servicePositions.find((pos) => pos.service.id === id))
-        .filter((pos) => pos !== undefined);
-
-      if (connectedPositions.length > 0) {
-        // Calculate average position of connected services
-        const avgX =
-          connectedPositions.reduce((sum, pos) => sum + pos!.x, 0) /
-          connectedPositions.length;
-        const avgZ =
-          connectedPositions.reduce((sum, pos) => sum + pos!.z, 0) /
-          connectedPositions.length;
-
-        // Try to find position around this average point
-        let radius = MIN_DISTANCE;
-        let position = null;
-
-        while (!position && radius < 50) {
-          position = findAvailablePosition(avgX, avgZ, radius);
-          radius += MIN_DISTANCE;
-        }
-
-        if (position) {
-          servicePositions.push({
-            service,
-            x: position.x,
-            z: position.z,
-          });
-          markPosition(position.x, position.z);
-        }
-      } else {
-        // No connections, place in next available position from origin
-        let radius = MIN_DISTANCE;
-        let position = null;
-
-        while (!position && radius < 50) {
-          position = findAvailablePosition(0, 0, radius);
-          radius += MIN_DISTANCE;
-        }
-
-        if (position) {
-          servicePositions.push({
-            service,
-            x: position.x,
-            z: position.z,
-          });
-          markPosition(position.x, position.z);
-        }
-      }
-    }
-
-    return servicePositions;
-  };
 
   // New method to create connections between world objects
   private createConnectionBetween(
@@ -579,11 +469,6 @@ export class World {
       lineRadius: options.lineRadius || 0.02,
       color: options.color || GREEN, // Default green for serviceStructure connections
     });
-  }
-
-  // Add getter for max anisotropy
-  public get maxAnisotropy(): number {
-    return this.renderer.capabilities.getMaxAnisotropy();
   }
 
   // Add getter for scene

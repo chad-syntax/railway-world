@@ -108,20 +108,26 @@ export class RequestBlock extends WorldObject {
   private determineRequestType(): string {
     const path = this.log.path.toLowerCase();
 
-    if (
-      path.match(/\.(jpg|jpeg|png|gif|svg|webp|ico)($|\?)/) ||
-      path.includes('image')
-    ) {
-      return 'IMG';
-    } else if (path.match(/\.(js|jsx|ts|tsx)($|\?)/)) {
-      return 'JS';
-    } else if (path.match(/\.(css|scss|sass)($|\?)/)) {
-      return 'CSS';
-    } else if (path.includes('/api/') || path.includes('/graphql')) {
-      return 'API';
-    } else {
-      return 'DOC';
+    // Define pattern-to-type mappings
+    const requestTypePatterns = [
+      {
+        type: 'IMG',
+        patterns: [/\.(jpg|jpeg|png|gif|svg|webp|ico)($|\?)/, /image/],
+      },
+      { type: 'JS', patterns: [/\.(js|jsx|ts|tsx)($|\?)/] },
+      { type: 'CSS', patterns: [/\.(css|scss|sass)($|\?)/] },
+      { type: 'API', patterns: [/\/api\//, /\/graphql/] },
+    ];
+
+    // Find the first matching pattern
+    for (const { type, patterns } of requestTypePatterns) {
+      if (patterns.some((pattern) => pattern.test(path))) {
+        return type;
+      }
     }
+
+    // Default case
+    return 'DOC';
   }
 
   private createBlock() {
